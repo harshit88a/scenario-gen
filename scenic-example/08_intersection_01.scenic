@@ -1,5 +1,4 @@
-# Scenario: Ego vehicle goes straight at 4-way intersection and must suddenly stop to 
-# avoid collision when adversary vehicle from opposite lane makes a left turn.
+# Scenario: Ego vehicle goes straight at 4-way intersection and must suddenly stop to avoid collision when adversary vehicle from opposite lane makes a left turn.
 
 
 ## 1. MAP AND MODEL CONFIGURATION

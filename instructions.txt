@@ -25,4 +25,9 @@ Example Scenic code which is best compatible:
 ```
 ```
 
+# Requirements
+
+pip install sentence-transformers 
+pip install -q -U google-generativeai
+
 

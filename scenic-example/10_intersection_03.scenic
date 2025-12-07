@@ -1,4 +1,4 @@
-# Scenario : Ego vehicle makes a right turn at a 3-way intersection. An adversary vehicle from a lateral lane goes straight, jumping red signal and causing a conflict.
+# Scenario: Ego vehicle makes a right turn at a 3-way intersection. An adversary vehicle from a lateral lane goes straight, jumping red signal and causing a conflict.
 
 
 ## 1. MAP AND MODEL CONFIGURATION
