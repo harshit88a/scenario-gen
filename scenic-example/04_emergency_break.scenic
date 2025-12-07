@@ -1,5 +1,4 @@
-# Scenario: Lead Vehicle Emergency Brake due to Obstacle - The leading vehicle decelerates suddenly due to a trash bin, 
-# forcing the ego-vehicle to perform an emergency brake.
+# Scenario: Lead Vehicle Emergency Brake due to Obstacle - The leading vehicle decelerates suddenly due to a trash bin, forcing the ego-vehicle to perform an emergency brake.
 
 ## 1. MAP AND MODEL CONFIGURATION
 param map = localPath('./../CARLA_0.9.15/CarlaUE4/Content/Carla/Maps/OpenDrive/Town05.xodr') 

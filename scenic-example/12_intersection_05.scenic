@@ -1,5 +1,4 @@
-# Scenario: Ego vehicle goes straight at a 3-way intersection. An adversary vehicle makes a left turn from a conflicting lane.
-# The Ego must brake suddenly to avoid a collision.
+# Scenario: Ego vehicle goes straight at a 3-way intersection. An adversary vehicle makes a left turn from a conflicting lane. The Ego must brake suddenly to avoid a collision.
 
 ## 1. MAP AND MODEL CONFIGURATION
 param map = localPath('./../CARLA_0.9.15/CarlaUE4/Content/Carla/Maps/OpenDrive/Town05.xodr')

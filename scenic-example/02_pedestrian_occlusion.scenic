@@ -1,5 +1,4 @@
-# Scenario 02: Pedestrian Crossing from Behind Occlusion - A parked truck occludes the view of a pedestrian who 
-# jaywalks into the ego vehicle's path when the ego gets close.
+# Scenario: Pedestrian Crossing from Behind Occlusion - A parked truck occludes the view of a pedestrian who jaywalks into the ego vehicle's path when the ego gets close.
 
 ## 1. MAP AND MODEL CONFIGURATION
 param map = localPath('./../CARLA_0.9.15/CarlaUE4/Content/Carla/Maps/OpenDrive/Town05.xodr') 

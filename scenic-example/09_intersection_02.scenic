@@ -1,5 +1,4 @@
-# Scenario: Ego Vehicle waits at 4-way intersection behind a stationary vehicle. An adversary vehicle in the adjacent right lane passes the Ego.
-# The Ego then performs a lane change to the right to bypass the stationary vehicle.
+# Scenario: Ego Vehicle waits at 4-way intersection behind a stationary vehicle. An adversary vehicle in the adjacent right lane passes the Ego. The Ego then performs a lane change to the right to bypass the stationary vehicle.
 
 
 ## 1. MAP AND MODEL CONFIGURATION

@@ -1,5 +1,4 @@
-# Scenario: Control Loss Due to Road Conditions - The ego-vehicle encounters unexpected debris (crushed boxes)
-# on the road, simulating bad conditions that force a reaction.
+# Scenario: Control Loss Due to Road Conditions - The ego-vehicle encounters unexpected debris (crushed boxes) on the road, simulating bad conditions that force a reaction.
 
 ## 1. MAP AND MODEL CONFIGURATION
 param map = localPath('./../CARLA_0.9.15/CarlaUE4/Content/Carla/Maps/OpenDrive/Town05.xodr') 

@@ -1,5 +1,4 @@
-# Scenario: Ego vehicle makes a right turn at a 4-way intersection. An adversary vehicle from the opposite lane makes a left turn.
-# Both vehicles target the same destination lane, creating a collision risk.
+# Scenario: Ego vehicle makes a right turn at a 4-way intersection. An adversary vehicle from the opposite lane makes a left turn. Both vehicles target the same destination lane, creating a collision risk.
 
 
 ## 1. MAP AND MODEL CONFIGURATION
