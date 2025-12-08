@@ -1,0 +1,242 @@
+
+SYSTEM ROLE: You are an expert Autonomous Vehicle Simulation Engineer specializing in the Scenic 3.0.0 programming language and CARLA 0.9.15. Your task is to generate valid Scenic code for adversarial scenarios based on Scenario Description provided below.
+
+CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
+1. ONLY USE methods, classes, and blueprints that appear in the few-shot examples below.
+2. NEVER invent or hallucinate any classes, methods, or blueprints that are not in the examples.
+3. NEVER use deprecated Scenic syntax - only use patterns shown in the examples.
+4. ONLY use CARLA blueprints that appear in the examples (e.g., vehicle.lincoln.mkz_2017, walker.pedestrian.0001).
+5. ONLY use Scenic behaviors that appear in the examples (e.g., BehaviorType, Follow, FollowLaneBehavior).
+6. All scenarios must use Town05 map.
+7. Output MUST have exactly four labeled sections as shown below.
+
+OUTPUT FORMAT - DO NOT DEVIATE:
+# 1. MAP AND MODEL CONFIGURATION
+# 2. ADV BEHAVIOR OF THE SURROUNDING OBJECT
+# 3. ROAD GEOMETRY
+# 4. RELATIVE SPAWN POSITION OF THE ADVERSARIAL AGENT
+
+FEW-SHOT EXAMPLES (SOURCE OF TRUTH - ONLY USE THESE):
+
+Example 1 (Description: A pedestrian appears out of nowhere and crossing the road when the ego car is approaching):
+```scenic
+# Scenario: A pedestrian appears out of nowhere and crossing the road when the ego car is approaching
+
+## 1. MAP AND MODEL CONFIGURATION
+param map = localPath('./../CARLA_0.9.15/CarlaUE4/Content/Carla/Maps/OpenDrive/Town05.xodr')
+param carla_map = 'Town05'
+param use2DMap = True
+model scenic.simulators.carla.model
+
+# Explicitly import the standard CrossingBehavior
+from scenic.simulators.carla.behaviors import CrossingBehavior
+
+## 2. ADV BEHAVIOR OF THE SURROUNDING OBJECT
+param EGO_SPEED = 10
+param PED_SPEED = 2.0
+param TRIGGER_DIST = 15
+
+# Ego: Simply follows the lane at a set speed
+behavior EgoBehavior(target_speed):
+    do FollowLaneBehavior(target_speed=target_speed)
+
+## 3. ROAD GEOMETRY
+EGO_MODEL = "vehicle.lincoln.mkz_2017"
+
+# Pick a lane from the network
+initLane = Uniform(*network.lanes)
+
+# Create a spawn point on this lane
+spawnPt = new OrientedPoint on initLane.centerline
+
+# Create Ego at the spawn point
+# Offset z by 0.5 to prevent ground clipping
+ego = new Car at spawnPt offset by (0, 0, 0.5),
+    with blueprint EGO_MODEL,
+    with behavior EgoBehavior(globalParameters.EGO_SPEED)
+
+# Requirement: Avoid spawning too close to intersections to allow a straight run
+require (distance to intersection) > 50
+
+## 4. RELATIVE SPAWN POSITION OF THE ADVERSARIAL AGENT
+param START_DISTANCE = Range(20, 30)
+param LATERAL_OFFSET = Range(3.5, 4.5)
+
+# 1. Find a reference point ahead of the ego on the road center
+adv_spot_road = new OrientedPoint following roadDirection from spawnPt for globalParameters.START_DISTANCE
+
+# 2. Define the pedestrian spawn point to the right of the road (sidewalk/shoulder)
+ped_spawn = new OrientedPoint right of adv_spot_road by globalParameters.LATERAL_OFFSET
+
+# 3. Create the Pedestrian
+# We use the built-in 'CrossingBehavior' which accepts (ego, speed, threshold).
+# - ego: The agent to wait for.
+# - speed: Walking speed.
+# - threshold: Distance to ego to trigger crossing.
+# Offset z by 1.0 to ensure the pedestrian doesn't spawn in the ground.
+ped = new Pedestrian at ped_spawn offset by (0, 0, 1),
+    facing 90 deg relative to adv_spot_road.heading,
+    with regionContainedIn None,
+    with behavior CrossingBehavior(ego, globalParameters.PED_SPEED, globalParameters.TRIGGER_DIST)
+
+# Requirement: Pedestrian must start off the drivable lane to simulate appearing from the side
+require ped not in network.drivableRegion
+```
+
+Example 2 (Description: Ego vehicle must suddenly stop to avoid collision when pedestrian crosses the road unexpectedly.):
+```scenic
+# Scenario: Ego vehicle must suddenly stop to avoid collision when pedestrian crosses the road unexpectedly.
+
+## 1. MAP AND MODEL CONFIGURATION
+param map = localPath('./../CARLA_0.9.15/CarlaUE4/Content/Carla/Maps/OpenDrive/Town05.xodr')
+param carla_map = 'Town05'
+param use2DMap = True
+model scenic.simulators.carla.model
+
+# Explicitly import the standard CrossingBehavior
+from scenic.simulators.carla.behaviors import CrossingBehavior
+
+## 2. ADV BEHAVIOR OF THE SURROUNDING OBJECT
+param EGO_SPEED = 10
+param PED_SPEED = 2.0
+param TRIGGER_DIST = 15
+
+# Ego: Simply follows the lane at a set speed
+behavior EgoBehavior(target_speed):
+    do FollowLaneBehavior(target_speed=target_speed)
+
+## 3. ROAD GEOMETRY
+EGO_MODEL = "vehicle.lincoln.mkz_2017"
+
+# Pick a lane from the network
+initLane = Uniform(*network.lanes)
+
+# Create a spawn point on this lane
+spawnPt = new OrientedPoint on initLane.centerline
+
+# Create Ego at the spawn point
+# Offset z by 0.5 to prevent ground clipping
+ego = new Car at spawnPt offset by (0, 0, 0.5),
+    with blueprint EGO_MODEL,
+    with behavior EgoBehavior(globalParameters.EGO_SPEED)
+
+# Requirement: Avoid spawning too close to intersections
+require (distance to intersection) > 50
+
+## 4. RELATIVE SPAWN POSITION OF THE ADVERSARIAL AGENT
+param START_DISTANCE = Range(20, 30)
+param LATERAL_OFFSET = Range(3.5, 4.5)
+
+# 1. Find a reference point ahead of the ego on the road center
+adv_spot_road = new OrientedPoint following roadDirection from spawnPt for globalParameters.START_DISTANCE
+
+# 2. Define the pedestrian spawn point to the right of the road (sidewalk)
+ped_spawn = new OrientedPoint right of adv_spot_road by globalParameters.LATERAL_OFFSET
+
+# 3. Create the Pedestrian
+# We use the built-in 'CrossingBehavior' which accepts (ego, speed, threshold).
+# - ego: The agent to wait for.
+# - speed: Walking speed.
+# - threshold: Distance to ego to trigger crossing.
+# Offset z by 1.0 to ensure the pedestrian doesn't spawn in the ground.
+ped = new Pedestrian at ped_spawn offset by (0, 0, 1),
+    facing 90 deg relative to adv_spot_road.heading,
+    with regionContainedIn None,
+    with behavior CrossingBehavior(ego, globalParameters.PED_SPEED, globalParameters.TRIGGER_DIST)
+
+# Requirement: Pedestrian must start off the drivable lane
+require ped not in network.drivableRegion
+```
+
+Example 3 (Description: Pedestrian Crossing from Behind Occlusion - A parked truck occludes the view of a pedestrian who jaywalks into the ego vehicle's path when the ego gets close.):
+```scenic
+# Scenario: Pedestrian Crossing from Behind Occlusion - A parked truck occludes the view of a pedestrian who jaywalks into the ego vehicle's path when the ego gets close.
+
+## 1. MAP AND MODEL CONFIGURATION
+param map = localPath('./../CARLA_0.9.15/CarlaUE4/Content/Carla/Maps/OpenDrive/Town05.xodr') 
+param carla_map = 'Town05'
+param use2DMap = True
+model scenic.simulators.carla.model
+
+
+## 2. ADV BEHAVIOR OF THE SURROUNDING OBJECT
+# Parameters for the adversary search
+param PED_SPEED = Range(1.5, 3.0)       # Walking speed
+param TRIGGER_DIST = Range(10, 18)      # Distance from Ego to start walking
+
+# Custom helper behavior to handle walking actions explicitly
+# This avoids "unexpected keyword argument" errors in different library versions
+behavior CrossingWalk(target_speed):
+    while True:
+        # Continuously set direction and speed to ensure movement
+        take SetWalkingDirectionAction(self.heading), SetWalkingSpeedAction(target_speed)
+
+# Main Pedestrian Behavior
+behavior PedestrianOcclusionBehavior(target_ego):
+    # State 1: Wait while hidden behind the truck
+    while (distance from target_ego to self) > globalParameters.TRIGGER_DIST:
+        wait
+    
+    # State 2: Cross the street using our custom walker behavior
+    do CrossingWalk(target_speed=globalParameters.PED_SPEED)
+
+# Behavior for the Truck: Simply stay parked
+behavior ParkedBehavior():
+    take SetBrakeAction(1.0)
+    take SetHandBrakeAction(True)
+
+
+## 3. ROAD GEOMETRY
+EGO_MODEL = "vehicle.tesla.model3"
+
+# Find a valid lane
+lane = Uniform(*network.lanes)
+
+# Create the Ego Spawn Point
+EgoSpawnPt = new OrientedPoint on lane.centerline
+
+# Spawn Ego
+# Speed is set to 10 m/s (36 km/h)
+ego = new Car at EgoSpawnPt offset by (0, 0, 0.5),
+    with blueprint EGO_MODEL,
+    with behavior FollowLaneBehavior(target_speed=10)
+
+# Requirement: Ensure clean geometry (not in intersection)
+require (distance to intersection) > 40
+
+
+## 4. RELATIVE SPAWN POSITION OF THE ADVERSARIAL AGENT
+# Distance of the truck ahead of the ego
+param OCCLUDER_DIST = Range(20, 30) 
+param SIDE_OFFSET = -3.5 
+
+# Step 1: Create the spot for the Parked Truck (The Occluder)
+truck_spot = new OrientedPoint following roadDirection from EgoSpawnPt for globalParameters.OCCLUDER_DIST
+
+# Step 2: Spawn the Truck
+occluder_truck = new Truck at truck_spot offset by (globalParameters.SIDE_OFFSET, 0, 0.5),
+    with behavior ParkedBehavior()
+
+# Step 3: Spawn the Pedestrian relative to the Truck
+# We define the orientation in the OrientedPoint using 'facing'.
+# (-0.5, 4.0) places the ped slightly inside the truck's line and ahead of it.
+# 'facing 90 deg relative to occluder_truck' rotates the point Left (towards the road).
+ped_spawn = new OrientedPoint at (-0.5, 4.0) relative to occluder_truck,
+    facing 90 deg relative to occluder_truck
+
+bad_pedestrian = new Pedestrian at ped_spawn,
+    with regionContainedIn None,
+    with behavior PedestrianOcclusionBehavior(ego)
+
+# Requirement: Ensure the pedestrian is valid and not colliding immediately
+require (distance from bad_pedestrian to occluder_truck) > 1
+```
+
+
+IMPORTANT: Generate code that closely mimics the structure and patterns from the examples above. Do not introduce new methods or classes.
+
+TASK: Generate the Scenic code for the following scenario description. Follow the four-section format exactly.
+
+SCENARIO DESCRIPTION: A pedestrian appears out of nowhere and crossing the road while a ego vehicle approaches
+
+Generate the Scenic code:
