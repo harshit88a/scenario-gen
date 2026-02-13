@@ -1,0 +1,22 @@
+param EGO_SPEED = 10
+param ADV_SPEED = 15
+param SAFETY_DIST = 20
+param BRAKE_INTENSITY = 1.0
+
+monitor GreenWave():
+    freezeTrafficLights()
+    while True:
+        if withinDistanceToTrafficLight(ego, 100):
+            setClosestTrafficLightStatus(ego, "green")
+        if withinDistanceToTrafficLight(adversary, 100):
+            setClosestTrafficLightStatus(adversary, "green")
+        wait
+
+behavior AdversaryBehavior(trajectory):
+    do FollowTrajectoryBehavior(trajectory=trajectory, target_speed=globalParameters.ADV_SPEED)
+
+behavior EgoBehavior(trajectory):
+    try:
+        do FollowTrajectoryBehavior(trajectory=trajectory, target_speed=globalParameters.EGO_SPEED)
+    interrupt when withinDistanceToAnyObjs(self, globalParameters.SAFETY_DIST):
+        take SetBrakeAction(globalParameters.BRAKE_INTENSITY)

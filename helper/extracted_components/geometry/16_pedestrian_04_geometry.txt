@@ -1,0 +1,8 @@
+intersections = filter(lambda i: i.is4Way or i.is3Way, network.intersections)
+intersection = Uniform(*intersections)
+
+right_turns = filter(lambda m: m.type is ManeuverType.RIGHT_TURN, intersection.maneuvers)
+egoManeuver = Uniform(*right_turns)
+
+egoInitLane = egoManeuver.startLane
+egoTrajectory = [egoInitLane, egoManeuver.connectingLane, egoManeuver.endLane]

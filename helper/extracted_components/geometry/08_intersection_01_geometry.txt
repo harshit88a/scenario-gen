@@ -1,0 +1,12 @@
+ADV_MODEL = "vehicle.tesla.model3"
+
+fourWayIntersections = filter(lambda i: i.is4Way, network.intersections)
+intersec = Uniform(*fourWayIntersections)
+
+ego_maneuvers = filter(lambda m: m.type == ManeuverType.STRAIGHT, intersec.maneuvers)
+ego_maneuver = Uniform(*ego_maneuvers)
+ego_trajectory = [ego_maneuver.startLane, ego_maneuver.connectingLane, ego_maneuver.endLane]
+
+adv_maneuvers = filter(lambda m: m.type == ManeuverType.LEFT_TURN, ego_maneuver.conflictingManeuvers)
+adv_maneuver = Uniform(*adv_maneuvers)
+adv_trajectory = [adv_maneuver.startLane, adv_maneuver.connectingLane, adv_maneuver.endLane]

@@ -1,0 +1,15 @@
+param PARKED_DIST = Range(25, 35)
+param PED_DIST_FROM_CAR = 4.0 
+
+parked_spot = new OrientedPoint following roadDirection from parked_spawn_pt for globalParameters.PARKED_DIST
+
+ped_ref_spot = new OrientedPoint following roadDirection from parked_spot for globalParameters.PED_DIST_FROM_CAR
+ped_spawn_pt = new OrientedPoint right of ped_ref_spot by 0.5
+
+ego = new Car at ego_spawn_pt offset by (0, 0, 0.5),
+    with blueprint EGO_MODEL,
+    with behavior EgoBehavior(globalParameters.EGO_SPEED)
+
+parked_car = new Car at parked_spot offset by (0, 0, 0.5),
+    with blueprint PARKED_MODEL,
+    with behavior ParkedBehavior()

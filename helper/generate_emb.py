@@ -4,93 +4,78 @@ import json
 import re
 from sentence_transformers import SentenceTransformer
 
-SCENIC_FOLDER = "./../scenic-example"  # Path to folder with .scenic files
-OUTPUT_FILE = "./../scenario_database.json"
+# Paths
+SCENIC_SOURCE = "./../scenic-example"
+OUTPUT_BASE = "extracted_components"
 MODEL_NAME = "all-MiniLM-L6-v2"
 
+# Subfolders and Flexible Regex
+# This regex looks for:
+# 1. The Section Header (e.g., ## 2. ADV BEHAVIOR...)
+# 2. Any amount of whitespace/newlines
+# 3. A comment line starting with one or more # (The description)
+# 4. All code until the next "## " header or end of file
+CATEGORIES = {
+    "adv_behaviour": r"## 2\. ADV BEHAVIOR OF THE SURROUNDING OBJECT.*?#+\s*(.*?)\n(.*?)(?=## 3|$)",
+    "geometry": r"## 3\. GEOMETRY.*?#+\s*(.*?)\n(.*?)(?=## 4|$)",
+    "rel_pos": r"## 4\. RELATIVE SPAWN POSITION OF THE ADVERSARIAL AGENT.*?#+\s*(.*?)\n(.*?)(?=$)"
+}
 
-def extract_scenario_description(file_path):
-    """
-    Extracts the multi-line scenario description starting at '# Scenario:' 
-    and stops before section headers such as '# 1. MAP ...'
-    """
-    description_lines = []
-    capture_mode = False
-
-    section_header_pattern = re.compile(r"#+\s*\d+[\.\)]")  
-    # Matches: # 1. Text, ## 2) Text, ### 3. etc.
-
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            for line in f:
-                stripped = line.strip()
-
-                # Detect start of scenario block
-                if "# Scenario:" in line:
-                    capture_mode = True
-                    clean_line = line.split("# Scenario:", 1)[1].strip()
-                    if clean_line:
-                        description_lines.append(clean_line)
-                    continue
-
-                if capture_mode:
-                    # Stop if next comment line is a numbered section
-                    if stripped.startswith("#") and section_header_pattern.match(stripped):
-                        break
-
-                    # Continue capturing only normal comment description lines
-                    if stripped.startswith("#"):
-                        clean_line = stripped.lstrip("#").strip()
-                        if clean_line:
-                            description_lines.append(clean_line)
-                        continue
-
-                    # Stop on first non-comment non-empty line
-                    if stripped != "":
-                        break
-
-        return " ".join(description_lines).strip()
-
-    except Exception as e:
-        print(f"Error reading {file_path}: {e}")
-        return None
-
+def setup_folders():
+    for cat in CATEGORIES.keys():
+        os.makedirs(os.path.join(OUTPUT_BASE, cat), exist_ok=True)
 
 def main():
-    print(f"Loading embedding model: {MODEL_NAME}...")
+    print(f"Loading model: {MODEL_NAME}...")
     model = SentenceTransformer(MODEL_NAME)
+    
+    setup_folders()
+    
+    scenic_files = glob.glob(os.path.join(SCENIC_SOURCE, "*.scenic"))
+    print(f"Found {len(scenic_files)} files to process.")
 
-    # Find all scenic files
-    search_path = os.path.join(SCENIC_FOLDER, "*.scenic")
-    scenic_files = glob.glob(search_path)
-
-    print(f"Found {len(scenic_files)} scenic files.")
-
-    database = []
+    databases = {cat: [] for cat in CATEGORIES.keys()}
 
     for file_path in scenic_files:
-        print(f"Processing: {os.path.basename(file_path)}")
+        filename = os.path.basename(file_path)
+        print(f"Processing: {filename}")
+        
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
 
-        description = extract_scenario_description(file_path)
+        for cat, pattern in CATEGORIES.items():
+            # re.DOTALL allows '.' to match newlines
+            # re.IGNORECASE for safety
+            match = re.search(pattern, content, re.DOTALL | re.IGNORECASE)
+            
+            if match:
+                description = match.group(1).strip()
+                code_snippet = match.group(2).strip()
+                
+                # Create filename and save code
+                snippet_filename = f"{os.path.splitext(filename)[0]}_{cat}.txt"
+                snippet_path = os.path.join(OUTPUT_BASE, cat, snippet_filename)
+                
+                with open(snippet_path, "w", encoding="utf-8") as f_out:
+                    f_out.write(code_snippet)
+                
+                # Generate embedding
+                embedding = model.encode(description).tolist()
+                
+                databases[cat].append({
+                    "text": description,
+                    "code": "./helper/" + snippet_path,
+                    "embedding": embedding
+                })
+            else:
+                print(f"  [!] Missing or malformed section {cat} in {filename}")
 
-        if description:
-            embedding_vector = model.encode(description).tolist()
-
-            entry = {
-                "scenario": description,
-                "code": os.path.relpath(file_path, start="."),
-                "embedding": embedding_vector
-            }
-
-            database.append(entry)
-        else:
-            print(f"Warning: No 'Scenario:' description found in {file_path}")
-
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(database, f, indent=4)
-
-    print(f"\nSuccess! Database saved to {OUTPUT_FILE} with {len(database)} entries.")
-
+    # Save the 3 JSON files
+    for cat, data in databases.items():
+        json_out = os.path.join(OUTPUT_BASE, f"{cat}.json")
+        with open(json_out, "w", encoding="utf-8") as jf:
+            json.dump(data, jf, indent=4)
+        print(f"Saved database: {json_out}")
 
 if __name__ == "__main__":
     main()

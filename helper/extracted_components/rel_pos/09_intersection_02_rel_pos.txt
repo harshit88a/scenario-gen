@@ -1,0 +1,33 @@
+param STAT_DIST = Range(6, 9)       
+param EGO_GAP = Range(12, 15)        
+param ADV_DIST = Range(20, 25)      
+
+stat_init_pt = new OrientedPoint in stat_lane.centerline
+stat_spawn_pt = new OrientedPoint following roadDirection from stat_init_pt for -globalParameters.STAT_DIST
+
+ego_spawn_pt = new OrientedPoint following roadDirection from stat_spawn_pt for -globalParameters.EGO_GAP
+
+adv_init_pt = new OrientedPoint in adv_lane.centerline
+adv_spawn_pt = new OrientedPoint following roadDirection from adv_init_pt for -globalParameters.ADV_DIST
+
+ego_start_section = network.laneSectionAt(ego_spawn_pt)
+
+require ego_start_section is not None
+require ego_start_section._laneToRight is not None
+
+target_section = ego_start_section.laneToRight
+
+stationary = new Car at stat_spawn_pt offset by (0, 0, 0.5),
+    with blueprint EGO_MODEL,
+    with behavior StationaryBehavior()
+
+ego = new Car at ego_spawn_pt offset by (0, 0, 0.5),
+    with blueprint EGO_MODEL,
+    with behavior EgoBehavior(target_section)
+
+adversary = new Car at adv_spawn_pt offset by (0, 0, 0.5),
+    with blueprint ADV_MODEL,
+    with behavior AdversaryBehavior(adv_trajectory)
+
+require monitor GreenWave()
+terminate when (distance to stat_spawn_pt) > 70

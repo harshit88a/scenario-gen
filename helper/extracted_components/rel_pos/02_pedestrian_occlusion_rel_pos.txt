@@ -1,0 +1,16 @@
+param OCCLUDER_DIST = Range(20, 30) 
+param SIDE_OFFSET = -3.5 
+
+truck_spot = new OrientedPoint following roadDirection from EgoSpawnPt for globalParameters.OCCLUDER_DIST
+
+occluder_truck = new Truck at truck_spot offset by (globalParameters.SIDE_OFFSET, 0, 0.5),
+    with behavior ParkedBehavior()
+
+ped_spawn = new OrientedPoint at (-0.5, 4.0) relative to occluder_truck,
+    facing 90 deg relative to occluder_truck
+
+bad_pedestrian = new Pedestrian at ped_spawn,
+    with regionContainedIn None,
+    with behavior PedestrianOcclusionBehavior(ego)
+
+require (distance from bad_pedestrian to occluder_truck) > 1

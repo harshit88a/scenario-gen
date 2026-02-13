@@ -1,0 +1,23 @@
+ADV_MODEL = "vehicle.tesla.model3"
+
+def get_conflict_pairs(intersections):
+    pairs = []
+    for intersec in intersections:
+        straights = filter(lambda m: m.type == ManeuverType.STRAIGHT, intersec.maneuvers)
+        for s in straights:
+            conflicts = filter(lambda c: c.type == ManeuverType.LEFT_TURN, s.conflictingManeuvers)
+            for c in conflicts:
+                pairs.append([s, c])
+    return pairs
+
+three_way_intersections = filter(lambda i: i.is3Way, network.intersections)
+valid_pairs = get_conflict_pairs(three_way_intersections)
+
+require len(valid_pairs) > 0
+
+selected_pair = Uniform(*valid_pairs)
+ego_maneuver = selected_pair[0]
+adv_maneuver = selected_pair[1]
+
+ego_trajectory = [ego_maneuver.startLane, ego_maneuver.connectingLane, ego_maneuver.endLane]
+adv_trajectory = [adv_maneuver.startLane, adv_maneuver.connectingLane, adv_maneuver.endLane]

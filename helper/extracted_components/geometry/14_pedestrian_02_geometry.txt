@@ -1,0 +1,4 @@
+initLane = Uniform(*network.lanes)
+spawnPt = new OrientedPoint on initLane.centerline
+
+require (distance from spawnPt to intersection) > 50

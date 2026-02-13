@@ -1,0 +1,10 @@
+initLane = Uniform(*network.lanes)
+spawnPt = new OrientedPoint on initLane.centerline
+
+require (distance from spawnPt to intersection) > 50
+
+checkPt = new OrientedPoint left of spawnPt by 3.5
+targetSection = network.laneSectionAt(checkPt)
+
+require targetSection is not None
+require targetSection.lane != initLane

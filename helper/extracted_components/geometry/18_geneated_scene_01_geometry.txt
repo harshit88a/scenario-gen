@@ -1,0 +1,11 @@
+from scenic.simulators.carla.behaviors import FollowLaneBehavior, CrossingBehavior
+from scenic.simulators.carla.actions import SetHandBrakeAction
+
+PARKED_MODEL = "vehicle.nissan.patrol"
+PED_MODEL = "walker.pedestrian.0001"
+
+initLane = Uniform(*network.lanes)
+ego_spawn_pt = new OrientedPoint on initLane.centerline
+parked_spawn_pt = new OrientedPoint right of ego_spawn_pt by 3.5
+
+require (distance from ego_spawn_pt to intersection) > 50

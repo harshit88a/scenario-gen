@@ -1,0 +1,19 @@
+param EGO_DIST_TO_INTERSECTION = Range(15, 20)
+param ADV_DIST_TO_INTERSECTION = Range(15, 25)
+
+ego_anchor = new OrientedPoint at ego_maneuver.startLane.centerline.points[-1]
+adv_anchor = new OrientedPoint at adv_maneuver.startLane.centerline.points[-1]
+
+ego_spawn_pt = new OrientedPoint following roadDirection from ego_anchor for -globalParameters.EGO_DIST_TO_INTERSECTION
+adv_spawn_pt = new OrientedPoint following roadDirection from adv_anchor for -globalParameters.ADV_DIST_TO_INTERSECTION
+
+ego = new Car at ego_spawn_pt offset by (0, 0, 0.5),
+    with blueprint EGO_MODEL,
+    with behavior EgoBehavior(ego_trajectory)
+
+adversary = new Car at adv_spawn_pt offset by (0, 0, 0.5),
+    with blueprint ADV_MODEL,
+    with behavior AdversaryBehavior(adv_trajectory)
+
+require monitor GreenWave()
+terminate when (distance to ego_spawn_pt) > 60

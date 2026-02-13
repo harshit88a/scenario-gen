@@ -1,0 +1,15 @@
+param PED_SPEED = Range(1.5, 3.0)
+param TRIGGER_DIST = Range(10, 18)
+
+behavior CrossingWalk(target_speed):
+    while True:
+        take SetWalkingDirectionAction(self.heading), SetWalkingSpeedAction(target_speed)
+
+behavior PedestrianOcclusionBehavior(target_ego):
+    while (distance from target_ego to self) > globalParameters.TRIGGER_DIST:
+        wait
+    do CrossingWalk(target_speed=globalParameters.PED_SPEED)
+
+behavior ParkedBehavior():
+    take SetBrakeAction(1.0)
+    take SetHandBrakeAction(True)
