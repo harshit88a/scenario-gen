@@ -1,0 +1,14 @@
+param DIST_EGO_TO_LEAD = Range(10, 15)
+param DIST_LEAD_TO_OBSTACLE = Range(30, 40)
+
+lead_spot = new OrientedPoint following roadDirection from EgoSpawnPt for globalParameters.DIST_EGO_TO_LEAD
+
+obs_spot = new OrientedPoint following roadDirection from lead_spot for globalParameters.DIST_LEAD_TO_OBSTACLE
+
+obstacle = new Prop at obs_spot offset by (0, 0, 0.5),
+    with blueprint "static.prop.trashcan01"
+
+leadCar = new Car at lead_spot offset by (0, 0, 0.5),
+    with behavior LeadCarBehavior(obstacle, globalParameters.BRAKE_FORCE)
+
+terminate when ego.speed < 0.1 and (distance to leadCar) < 5

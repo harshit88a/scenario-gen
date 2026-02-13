@@ -1,0 +1,8 @@
+param START_DISTANCE = Range(20, 30)
+
+adv_spot = new OrientedPoint following roadDirection from spawnPt for globalParameters.START_DISTANCE
+
+advAgent = new Car at adv_spot offset by (0, 0, 0.5),
+    with behavior SlowLeadBehavior()
+
+require (distance from advAgent to intersection) > 20

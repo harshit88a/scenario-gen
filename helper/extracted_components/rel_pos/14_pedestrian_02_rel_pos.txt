@@ -1,0 +1,16 @@
+param START_DISTANCE = Range(20, 30)
+param LATERAL_OFFSET = Range(3.5, 4.5)
+
+ego = new Car at spawnPt offset by (0, 0, 0.5),
+    with blueprint EGO_MODEL,
+    with behavior EgoBehavior(globalParameters.EGO_SPEED)
+
+adv_spot_road = new OrientedPoint following roadDirection from spawnPt for globalParameters.START_DISTANCE
+ped_spawn = new OrientedPoint right of adv_spot_road by globalParameters.LATERAL_OFFSET
+
+ped = new Pedestrian at ped_spawn offset by (0, 0, 1),
+    facing 90 deg relative to adv_spot_road.heading,
+    with regionContainedIn None,
+    with behavior CrossingBehavior(ego, globalParameters.PED_SPEED, globalParameters.TRIGGER_DIST)
+
+require ped not in network.drivableRegion

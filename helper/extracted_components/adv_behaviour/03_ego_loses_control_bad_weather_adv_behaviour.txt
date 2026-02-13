@@ -1,0 +1,6 @@
+param DEBRIS_START_DIST = Range(15, 20)
+param DEBRIS_GAP = Range(6, 10) 
+
+behavior StaticObjectBehavior():
+    while True:
+        wait

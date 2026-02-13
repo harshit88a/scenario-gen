@@ -1,7 +1,7 @@
 import os
-import sys
 import json
 import torch
+import sys
 from datetime import datetime
 from google import genai
 from sentence_transformers import SentenceTransformer, util
@@ -10,102 +10,116 @@ from sentence_transformers import SentenceTransformer, util
 # 1. CONFIGURATION
 # ==========================================
 # Debug Flag
-DEBUG = False  # Set to True to save prompts
+DEBUG = True  # Set to True to save prompts
 
-# Paths
-JSON_DB_PATH = 'scenario_database.json'
-GENERATED_DIR = 'generated'
-PROMPT_DIR = 'prompt'
+DB_FILES = {
+    "behavior": "./helper/extracted_components/adv_behaviour.json",
+    "geometry": "./helper/extracted_components/geometry.json",
+    "rel_pos": "./helper/extracted_components/rel_pos.json"
+}
+CONFIG_FILE = "./helper/extracted_components/model_config.txt"
+GENERATED_DIR = "generated"
 
 # Models
-EMBEDDING_MODEL_NAME = 'all-MiniLM-L6-v2'
-LLM_MODEL_NAME = 'gemini-2.5-pro'
+EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
+DECOMPOSITION_MODEL = 'gemini-2.5-flash'
+GENERATION_MODEL = 'gemini-3-pro-preview'
 
-# API Key (From Environment Variable)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-
 if not GEMINI_API_KEY:
-    print("Error: GEMINI_API_KEY environment variable not found.")
+    print("Error: GEMINI_API_KEY not found in environment variables.")
     sys.exit(1)
-
-# Initialize GenAI Client
+    
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ==========================================
-# 2. RETRIEVAL LOGIC (Local Embeddings)
+# 2. SCENARIO DECOMPOSITION (Gemini 1.5 Flash)
 # ==========================================
-def load_database(path):
-    """Loads the JSON database containing scenarios and embeddings."""
-    try:
-        with open(path, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        print(f"Error: Database file '{path}' not found.")
-        sys.exit(1)
 
-def get_top_scenarios(query_text, db_data, model, device, top_k=3):
-    """Retrieves top K similar scenarios using local embeddings."""
-    # Encode the User Query
-    query_embedding = model.encode(query_text, convert_to_tensor=True, device=device)
+def decompose_scenario(user_scenario):
+    #Uses Gemini 1.5 Flash to split the scenario into 3 sub-parts.
+    prompt = f"""
+    Your task is to decompose full descriptions of safety-critical scenarios into:
+    1. Behavior: Describe the behavior of the adversarial object (you should also indicate the type of the object like pedestrians, cars, cyclists, and motorcycles)
+    2. Geometry: Specify the road condition where the scenario occurs (e.g., straight road, three-way intersection).
+    3. Spawn Position: Indicate the initial relative position of the adversarial object to the ego vehicle.
 
-    # Extract Embeddings from JSON
-    corpus_embeddings = [item['embedding'] for item in db_data]
-    corpus_embeddings = torch.tensor(corpus_embeddings).to(device)
+    Example 1:
+    Scenario: Ego drives straight; Leading car brakes suddenly.
+    Output:
+    {{
+        "behavior": "The adversarial car suddenly brakes when the ego approaches",
+        "geometry": "A straight road.",
+        "spawn_position": "The adversarial car is directly in front of the ego vehicle."
+    }}
 
-    # Calculate Cosine Similarity
-    cos_scores = util.cos_sim(query_embedding, corpus_embeddings)[0]
+    Example 2:
+    Scenario: TThe ego vehicle attempts a right turn at a four-way intersection, and an adversarial pedestrian steps onto the road in front of it
+    Output:
+    {{
+        "behavior": "The adversarial pedestrian deliberately steps onto the road right in front of the ego vehicle",
+        "geometry": "Lanes for turning right on a four-way intersection.",
+        "spawn_position": "The adversarial pedestrian is on the right front of the ego."
+    }}
 
-    # Retrieve Top K Results
-    top_results = torch.topk(cos_scores, k=min(top_k, len(db_data)))
-
-    # Move to CPU for processing
-    top_indices = top_results[1].cpu().numpy()
-    top_scores = top_results[0].cpu().numpy()
-
-    results = []
-    print(f"\n2. Top {top_k} results with similarity score:")
-    for score, idx in zip(top_scores, top_indices):
-        entry = db_data[idx]
-        print(f"   - Score: {score:.4f} | File: {entry['code']}")
-        
-        results.append({
-            "score": float(score),
-            "code_path": entry['code'],
-            "description": entry['scenario']
-        })
+    Decompose this: "{user_scenario}"
+    Return strictly as JSON.
+    """
     
+    response = client.models.generate_content(
+        model=DECOMPOSITION_MODEL,
+        contents=prompt,
+        config={'response_mime_type': 'application/json'}
+    )
+    return json.loads(response.text)
+
+# ==========================================
+# 3. COMPONENT RETRIEVAL (Vector Search)
+# ==========================================
+def get_top_3_snippets(query, db_path, embed_model, device, top_k=3):
+    # Searches a specific category JSON for the best matching Scenic snippet.
+    with open(db_path, 'r') as f:
+        db = json.load(f)
+    
+    # Ensure tensors are on the same device to prevent RuntimeErrors
+    query_emb = embed_model.encode(query, convert_to_tensor=True, device=device)
+    corpus_embs = torch.tensor([item['embedding'] for item in db]).to(device)
+    
+    # Cosine similarity search
+    scores = util.cos_sim(query_emb, corpus_embs)[0]
+    top_k = min(3, len(db))
+    top_results = torch.topk(scores, k=top_k)
+    
+    results = []
+    for idx in top_results.indices:
+        entry = db[idx.item()]
+        # Read the raw snippet code from the stored text file path
+        # with open(entry['code'], 'r') as f_snippet:
+        #     results.append((f_snippet.read(), entry['text']))
+        results.append((entry['code'], entry['text']))
     return results
 
 # ==========================================
-# 3. PROMPT ENGINEERING
+# 4. FINAL CODE GENERATION (Gemini 2.5 Pro)
 # ==========================================
-def read_scenic_file(path):
-    """Reads the raw content of a scenic file to use as a few-shot example."""
-    try:
-        # Get the directory where the script is running from
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        # Normalize the path: handle '../scenic-example/' or '../' prefixes
-        normalized_path = path.replace('../scenic-example/', 'scenic-example/').replace('../', '')
 
-        # Resolve the path relative to the script directory
-        full_path = os.path.join(script_dir, normalized_path)
-        full_path = os.path.abspath(full_path)  # Normalize the path
-
-        if not os.path.exists(full_path):
-            return f"# [SYSTEM ERROR: File not found at {full_path}]\n"
-
-        with open(full_path, 'r') as f:
-            return f.read()
-    except Exception as e:
-        return f"# [SYSTEM ERROR: Could not read file: {e}]\n"
-
-def construct_prompt(user_scenario, similar_examples):
-    """Builds the final prompt injecting the retrieved code as ground truth."""
+def construct_prompt(user_input, retrieved_context, fixed_config):
     
-    few_shot_context = ""
-    for i, example in enumerate(similar_examples):
-        code_content = read_scenic_file(example['code_path'])
-        few_shot_context += f"\nExample {i+1} (Description: {example['description']}):\n```scenic\n{code_content}\n```\n"
+    # helper to format the snippets for the prompt
+    def format_examples(category_dict):
+        text_block = ""
+        for i, (code_path, desc) in enumerate(category_dict):
+            with open(code_path, 'r') as f_snippet:
+                code = f_snippet.read()
+            text_block += f"#Example {i+1} (Description: {desc})\n{code}\n\n"
+        return text_block
+
+    # retrieved_context is expected to be a dict: 
+    # {'behavior': [(code1, desc1), ...], 'geometry': [...], 'rel_pos': [...]}
+    
+    behavior_examples = format_examples(retrieved_context['behavior'])
+    geometry_examples = format_examples(retrieved_context['geometry'])
+    rel_pos_examples = format_examples(retrieved_context['rel_pos'])
 
     prompt = f"""
 SYSTEM ROLE: You are an expert Autonomous Vehicle Simulation Engineer specializing in the Scenic 3.0.0 programming language and CARLA 0.9.15. Your task is to generate valid Scenic code for adversarial scenarios based on Scenario Description provided below.
@@ -116,124 +130,86 @@ CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
 3. NEVER use deprecated Scenic syntax - only use patterns shown in the examples.
 4. ONLY use CARLA blueprints that appear in the examples (e.g., vehicle.lincoln.mkz_2017, walker.pedestrian.0001).
 5. ONLY use Scenic behaviors that appear in the examples (e.g., BehaviorType, Follow, FollowLaneBehavior).
-6. All scenarios must use Town05 map.
-7. Output MUST have exactly four labeled sections as shown below.
+6. Output MUST have exactly four labeled sections as shown below.
 
 OUTPUT FORMAT - DO NOT DEVIATE:
-# 1. MAP AND MODEL CONFIGURATION
+# 1. MAP AND MODEL CONFIGURATION (fixed)
 # 2. ADV BEHAVIOR OF THE SURROUNDING OBJECT
 # 3. ROAD GEOMETRY
 # 4. RELATIVE SPAWN POSITION OF THE ADVERSARIAL AGENT
 
-FEW-SHOT EXAMPLES (SOURCE OF TRUTH - ONLY USE THESE):
-{few_shot_context}
+1. MAP AND MODEL CONFIGURATION
+{fixed_config}
+
+FEW-SHOT EXAMPLES FOR 2. ADV BEHAVIOR OF THE SURROUNDING OBJECT:
+{behavior_examples}
+
+FEW-SHOT EXAMPLES FOR 3. ROAD GEOMETRY:
+{geometry_examples}
+
+FEW-SHOT EXAMPLES FOR 4. RELATIVE SPAWN POSITION OF THE ADVERSARIAL AGENT:
+{rel_pos_examples}
 
 IMPORTANT: Generate code that closely mimics the structure and patterns from the examples above. Do not introduce new methods or classes.
 
 TASK: Generate the Scenic code for the following scenario description. Follow the four-section format exactly.
 
-SCENARIO DESCRIPTION: {user_scenario}
+SCENARIO DESCRIPTION: {user_input}
 
 Generate the Scenic code:
 """
     return prompt
 
-# ==========================================
-# 4. GENERATION & SAVING
-# ==========================================
-def save_generated_code(code_text, timestamp):
-    """Saves the LLM output to a .scenic file with timestamp as filename."""
-    if not os.path.exists(GENERATED_DIR):
-        os.makedirs(GENERATED_DIR)
-    
-    filename = f"{timestamp}.scenic"
-    filepath = os.path.join(GENERATED_DIR, filename)
-
-    # Clean up Markdown code blocks if LLM included them
-    clean_code = code_text.replace("```scenic", "").replace("```", "").strip()
-
-    with open(filepath, 'w') as f:
-        f.write(clean_code)
-    
-    return filepath
-
-def save_prompt(prompt_text, timestamp):
-    """Saves the prompt to a .txt file if DEBUG is enabled."""
-    if not DEBUG:
-        return None
-    
-    if not os.path.exists(PROMPT_DIR):
-        os.makedirs(PROMPT_DIR)
-    
-    filename = f"{timestamp}.txt"
-    filepath = os.path.join(PROMPT_DIR, filename)
-
-    with open(filepath, 'w') as f:
-        f.write(prompt_text)
-    
-    return filepath
 
 def main():
-    # 1. Setup Retrieval Model
+    # 1. Setup Gemini Client and SentenceTransformer
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f"Initializing embedding model on {device}...")
-    embed_model = SentenceTransformer(EMBEDDING_MODEL_NAME, device=device)
+    embed_model = SentenceTransformer(EMBEDDING_MODEL, device=device)
+    if not os.path.exists(GENERATED_DIR): os.makedirs(GENERATED_DIR)
     
-    # 2. Load Database
-    db_data = load_database(JSON_DB_PATH)
-
-    print("\n" + "="*50)
-    print(" AV SCENARIO GENERATOR (RAG + Gemini 2.5)")
-    print("="*50)
+    with open(CONFIG_FILE, 'r') as f:
+        fixed_config = f.read()
 
     while True:
-        try:
-            # 3. User Input
-            user_input = input("\n>> Enter new adversarial scenario description under 200 words (or 'exit'): ").strip()
-            if user_input.lower() in ['exit', 'quit']:
-                break
-            if not user_input:
-                continue
+        # 2. Get user input
+        user_input = input("\n>> Enter scenario (or 'exit'):").strip()
+        if user_input.lower() == 'exit': break
 
-            print(f"\n1. Processing scenario: \"{user_input}\"")
+        # 3. Decompose scernario
+        print("Decomposing scenario components...")
+        parts = decompose_scenario(user_input)
+        
+        # 4 Retrieve best snippets for each part
+        print("Retrieving best code snippets...")
+        selected_context = {}
+        for key, db_name in DB_FILES.items():
+            query_text = parts.get(key, "")
+            selected_context[key] = get_top_3_snippets(query_text, db_name, embed_model, device)
 
-            # 4. Retrieve Context
-            top_results = get_top_scenarios(user_input, db_data, embed_model, device)
+        # print(selected_context["behavior"][0][0])
 
-            # 5. Construct Prompt
-            final_prompt = construct_prompt(user_input, top_results)
-            
-            # Create timestamp for consistent naming
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            
-            # Save prompt if DEBUG is enabled
-            if DEBUG:
-                prompt_path = save_prompt(final_prompt, timestamp)
-                print(f"\n[DEBUG] Prompt saved to: {prompt_path}")
+        # 5. Construct final prompt
+        print("Synthesizing final Scenic code...")
+        final_prompt = construct_prompt(user_input, selected_context, fixed_config)
 
-            # 6. Call LLM
-            print("\n3. Getting response from LLM...")
-            try:
-                response = client.models.generate_content(
-                    model=LLM_MODEL_NAME,
-                    contents=final_prompt,
-                    config=genai.types.GenerateContentConfig(
-                        temperature=0.2  # Minimize randomness, prioritize consistency
-                    )
-                )
-                
-                generated_code = response.text
-                
-                # 7. Save Result
-                saved_path = save_generated_code(generated_code, timestamp)
-                print(f"\n4. Success! Scenic code saved to:\n   -> {saved_path}")
+        # 4. If debug, save the prompt for inspection
+        if DEBUG:
+            debug_path = os.path.join('prompt', f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
+            with open(debug_path, 'w') as f_debug:
+                f_debug.write(final_prompt)
+            print(f"Debug: Prompt saved to {debug_path}")
 
-            except Exception as e:
-                print(f"\n[Error] LLM Generation failed: {e}")
+        # 5. Generate final code with Gemini 2.5 Pro
+        response = client.models.generate_content(model=GENERATION_MODEL, contents=final_prompt)
+        generated_code = response.text.replace("```scenic", "").replace("```", "").strip()
 
-        except KeyboardInterrupt:
-            print("\nExiting...")
-            break
+        # 6. Save output
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_path = os.path.join(GENERATED_DIR, f"scenario_{timestamp}.scenic")
+        with open(out_path, 'w') as f:
+            f.write(generated_code)
+        
+        print(f"Success! Code saved to: {out_path}")
 
 if __name__ == "__main__":
     main()

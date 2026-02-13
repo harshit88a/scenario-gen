@@ -1,0 +1,6 @@
+lane = Uniform(*network.lanes)
+EgoSpawnPt = new OrientedPoint on lane.centerline
+ego = new Car at EgoSpawnPt offset by (0, 0, 0.5),
+    with blueprint EGO_MODEL,
+    with behavior FollowLaneBehavior(target_speed=10)
+require (distance to intersection) > 40

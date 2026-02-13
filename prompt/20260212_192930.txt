@@ -1,0 +1,225 @@
+
+SYSTEM ROLE: You are an expert Autonomous Vehicle Simulation Engineer specializing in the Scenic 3.0.0 programming language and CARLA 0.9.15. Your task is to generate valid Scenic code for adversarial scenarios based on Scenario Description provided below.
+
+CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
+1. ONLY USE methods, classes, and blueprints that appear in the few-shot examples below.
+2. NEVER invent or hallucinate any classes, methods, or blueprints that are not in the examples.
+3. NEVER use deprecated Scenic syntax - only use patterns shown in the examples.
+4. ONLY use CARLA blueprints that appear in the examples (e.g., vehicle.lincoln.mkz_2017, walker.pedestrian.0001).
+5. ONLY use Scenic behaviors that appear in the examples (e.g., BehaviorType, Follow, FollowLaneBehavior).
+6. Output MUST have exactly four labeled sections as shown below.
+
+OUTPUT FORMAT - DO NOT DEVIATE:
+# 1. MAP AND MODEL CONFIGURATION (fixed)
+# 2. ADV BEHAVIOR OF THE SURROUNDING OBJECT
+# 3. ROAD GEOMETRY
+# 4. RELATIVE SPAWN POSITION OF THE ADVERSARIAL AGENT
+
+1. MAP AND MODEL CONFIGURATION
+param map = localPath('./../CARLA_0.9.15/CarlaUE4/Content/Carla/Maps/OpenDrive/Town05.xodr')
+param carla_map = 'Town05'
+param use2DMap = True
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.lincoln.mkz_2017"
+
+FEW-SHOT EXAMPLES FOR 2. ADV BEHAVIOR OF THE SURROUNDING OBJECT:
+#Example 1 (Description: The adversarial car travels at a constant speed or accelerates to pass the ego vehicle on the right, creating a conflict when the ego attempts to change lanes.)
+param EGO_SPEED = Range(7, 10)
+param ADV_SPEED = 10
+param BRAKE_INTENSITY = 1.0
+param BYPASS_SAFETY_DIST = 10 
+
+behavior StationaryBehavior():
+    take SetBrakeAction(1.0)
+
+behavior AdversaryBehavior(trajectory):
+    do FollowTrajectoryBehavior(trajectory=trajectory, target_speed=globalParameters.ADV_SPEED)
+
+behavior EgoBehavior(target_section):
+    while (distance to adversary) < globalParameters.BYPASS_SAFETY_DIST:
+        take SetBrakeAction(globalParameters.BRAKE_INTENSITY)
+    
+    do LaneChangeBehavior(
+        laneSectionToSwitch=target_section,
+        target_speed=globalParameters.EGO_SPEED)
+    
+    do FollowLaneBehavior(target_speed=globalParameters.EGO_SPEED)
+
+monitor GreenWave():
+    freezeTrafficLights()
+    while True:
+        if withinDistanceToTrafficLight(ego, 100):
+            setClosestTrafficLightStatus(ego, "green")
+        wait
+
+#Example 2 (Description: The adversarial car jumps a red signal and continues straight through the intersection, creating a collision course with the ego vehicle.)
+param EGO_SPEED = Range(7, 10)
+param ADV_SPEED = Range(8, 12)
+param SAFETY_DIST = Range(10, 15)
+param BRAKE_INTENSITY = 1.0
+
+behavior EgoBehavior(trajectory):
+    try:
+        do FollowTrajectoryBehavior(target_speed=globalParameters.EGO_SPEED, trajectory=trajectory)
+    interrupt when withinDistanceToAnyObjs(self, globalParameters.SAFETY_DIST):
+        take SetBrakeAction(globalParameters.BRAKE_INTENSITY)
+
+behavior AdversaryBehavior(trajectory):
+    do FollowTrajectoryBehavior(target_speed=globalParameters.ADV_SPEED, trajectory=trajectory)
+
+monitor GreenWave():
+    freezeTrafficLights()
+    while True:
+        if withinDistanceToTrafficLight(ego, 100):
+            setClosestTrafficLightStatus(ego, "green")
+        wait
+
+#Example 3 (Description: The adversarial car (slow vehicle) accelerates as the ego attempts to merge back, intentionally blocking the lane change and forcing the ego to interact with a secondary leading vehicle.)
+param EGO_SPEED = 12
+param ADV_INIT_SPEED = 5
+param ADV_END_SPEED = 15     
+param LEAD_SPEED = 6         
+param TRIGGER_DIST = 15      
+param SAFETY_DIST = 12       
+
+behavior AdversaryBehavior():
+    do FollowLaneBehavior(target_speed=globalParameters.ADV_INIT_SPEED) until \
+        (self.lane != ego.lane)
+    do FollowLaneBehavior(target_speed=globalParameters.ADV_END_SPEED)
+
+behavior LeadBehavior():
+    do FollowLaneBehavior(target_speed=globalParameters.LEAD_SPEED)
+
+behavior EgoBehavior(target_section):
+    do FollowLaneBehavior(target_speed=globalParameters.EGO_SPEED) until \
+        (distance to adversary) < globalParameters.TRIGGER_DIST
+
+    do LaneChangeBehavior(laneSectionToSwitch=target_section, target_speed=globalParameters.EGO_SPEED)
+
+    try:
+        do FollowLaneBehavior(target_speed=globalParameters.EGO_SPEED)
+    interrupt when (distance to lead) < globalParameters.SAFETY_DIST:
+        take SetBrakeAction(1.0)
+
+
+
+FEW-SHOT EXAMPLES FOR 3. ROAD GEOMETRY:
+#Example 1 (Description: A multi-lane straight road.)
+initLane = Uniform(*network.lanes)
+spawnPt = new OrientedPoint on initLane.centerline
+
+require (distance from spawnPt to intersection) > 50
+
+checkPt = new OrientedPoint left of spawnPt by 3.5
+targetSection = network.laneSectionAt(checkPt)
+
+require targetSection is not None
+require targetSection.lane != initLane
+
+#Example 2 (Description: A four-way intersection with dedicated left-turn lanes.)
+ADV_MODEL = "vehicle.tesla.model3"
+
+fourWayIntersections = filter(lambda i: i.is4Way, network.intersections)
+intersec = Uniform(*fourWayIntersections)
+
+ego_maneuvers = filter(lambda i: i.type == ManeuverType.LEFT_TURN, intersec.maneuvers)
+ego_maneuver = Uniform(*ego_maneuvers)
+ego_trajectory = [ego_maneuver.startLane, ego_maneuver.connectingLane, ego_maneuver.endLane]
+
+adv_maneuvers = filter(lambda i: i.type == ManeuverType.STRAIGHT, ego_maneuver.conflictingManeuvers)
+adv_maneuver = Uniform(*adv_maneuvers)
+adv_trajectory = [adv_maneuver.startLane, adv_maneuver.connectingLane, adv_maneuver.endLane]
+
+#Example 3 (Description: A multi-lane approach to a four-way intersection.)
+ADV_MODEL = "vehicle.tesla.model3"
+
+fourWayIntersections = filter(lambda i: i.is4Way, network.intersections)
+intersec = Uniform(*fourWayIntersections)
+
+valid_lanes = filter(lambda l: l.sections[-1]._laneToRight is not None, intersec.incomingLanes)
+stat_lane = Uniform(*valid_lanes)
+
+stat_end_section = stat_lane.sections[-1]
+adv_lane = stat_end_section.laneToRight.lane
+
+adv_maneuvers = filter(lambda m: m.type == ManeuverType.STRAIGHT, adv_lane.maneuvers)
+adv_maneuver = Uniform(*adv_maneuvers)
+adv_trajectory = [adv_maneuver.startLane, adv_maneuver.connectingLane, adv_maneuver.endLane]
+
+
+
+FEW-SHOT EXAMPLES FOR 4. RELATIVE SPAWN POSITION OF THE ADVERSARIAL AGENT:
+#Example 1 (Description: The adversarial car is oncoming from the opposite lane, approaching the intersection from the front.)
+param EGO_DIST_TO_INTERSECTION = Range(15, 20)
+param ADV_DIST_TO_INTERSECTION = Range(20, 25)
+
+ego_init_pt = new OrientedPoint in ego_maneuver.startLane.centerline
+adv_init_pt = new OrientedPoint in adv_maneuver.startLane.centerline
+
+ego_spawn_pt = new OrientedPoint following roadDirection from ego_init_pt for -globalParameters.EGO_DIST_TO_INTERSECTION
+adv_spawn_pt = new OrientedPoint following roadDirection from adv_init_pt for -globalParameters.ADV_DIST_TO_INTERSECTION
+
+ego = new Car at ego_spawn_pt offset by (0, 0, 0.5),
+    with blueprint EGO_MODEL,
+    with behavior EgoBehavior(ego_trajectory)
+
+adversary = new Car at adv_spawn_pt offset by (0, 0, 0.5),
+    with blueprint ADV_MODEL,
+    with behavior AdversaryBehavior(adv_trajectory)
+
+require monitor GreenWave()
+terminate when (distance to ego_spawn_pt) > 100
+
+#Example 2 (Description: The adversarial pedestrian is at the corner or on the sidewalk of the destination road, positioned to the front-left of the ego vehicle.)
+param PED_OFFSET = Range(3.0, 5.0)
+
+egoSpawnPt = new OrientedPoint in egoInitLane.centerline
+
+ego = new Car at egoSpawnPt offset by (0, 0, 0.5),
+    with blueprint EGO_MODEL,
+    with behavior EgoBehavior(egoTrajectory)
+
+exit_lane_start = egoManeuver.endLane.centerline[0]
+exit_point = new OrientedPoint at exit_lane_start
+
+ped_spawn = new OrientedPoint right of exit_point by globalParameters.PED_OFFSET
+
+ped = new Pedestrian at ped_spawn offset by (0, 0, 1),
+    facing 90 deg relative to exit_point.heading,
+    with regionContainedIn None,
+    with behavior CrossingBehavior(ego, globalParameters.PED_SPEED, globalParameters.TRIGGER_DIST)
+
+require ped not in network.drivableRegion
+
+terminate when (distance to egoSpawnPt) > 70
+
+#Example 3 (Description: The adversarial pedestrian is on the sidewalk at the corner, positioned to the front-right or front-left of the ego vehicle.)
+egoSpawnPt = new OrientedPoint in egoInitLane.centerline
+
+ego = new Car at egoSpawnPt offset by (0, 0, 0.5),
+    with blueprint EGO_MODEL,
+    with behavior EgoBehavior(egoTrajectory)
+
+require 20 <= (distance from ego to egoInitLane.centerline[-1]) <= 25
+
+exit_point = new OrientedPoint at egoManeuver.endLane.centerline[0]
+ped_spawn = new OrientedPoint right of exit_point by globalParameters.PED_OFFSET
+
+ped = new Pedestrian at ped_spawn offset by (0, 0, 1),
+    facing 90 deg relative to exit_point.heading,
+    with regionContainedIn None,
+    with behavior CrossingBehavior(ego, globalParameters.PED_SPEED, globalParameters.TRIGGER_DIST)
+
+require ped not in network.drivableRegion
+
+terminate when (distance to egoSpawnPt) > 70
+
+
+
+IMPORTANT: Generate code that closely mimics the structure and patterns from the examples above. Do not introduce new methods or classes.
+
+TASK: Generate the Scenic code for the following scenario description. Follow the four-section format exactly.
+
+SCENARIO DESCRIPTION: The ego vehicle is trying to change the lane and suddenly a speeding car appears from behind with a chance of collision
+
+Generate the Scenic code:

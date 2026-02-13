@@ -1,0 +1,21 @@
+param PED_OFFSET = Range(4.0, 6.0)
+
+egoSpawnPt = new OrientedPoint in egoInitLane.centerline
+
+ego = new Car at egoSpawnPt offset by (0, 0, 0.5),
+    with blueprint EGO_MODEL,
+    with behavior EgoBehavior(egoTrajectory)
+
+require 20 <= (distance from ego to egoInitLane.centerline[-1]) <= 25
+
+turn_point = new OrientedPoint at egoInitLane.centerline[-1]
+ped_spawn = new OrientedPoint right of turn_point by globalParameters.PED_OFFSET
+
+ped = new Pedestrian at ped_spawn offset by (0, 0, 1),
+    facing 90 deg relative to turn_point.heading,
+    with regionContainedIn None,
+    with behavior CrossingBehavior(ego, globalParameters.PED_SPEED, globalParameters.TRIGGER_DIST)
+
+require ped not in network.drivableRegion
+
+terminate when (distance to egoSpawnPt) > 50
