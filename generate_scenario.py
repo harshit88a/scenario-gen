@@ -125,7 +125,8 @@ def construct_prompt(user_input, retrieved_context, fixed_config):
 SYSTEM ROLE: You are an expert Autonomous Vehicle Simulation Engineer specializing in the Scenic 3.0.0 programming language and CARLA 0.9.15. Your task is to generate valid Scenic code for adversarial scenarios based on Scenario Description provided below.
 
 CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
-1. ONLY USE methods, classes, and blueprints that appear in the few-shot examples below.
+1. Try to use methods, classes, and blueprints that appear in the few-shot examples below.
+2. You can refer Scenic 3.0.0 documentation for syntax: https://docs.scenic-lang.org/en/3.x/syntax_guide.html#syntax-guide
 2. NEVER invent or hallucinate any classes, methods, or blueprints that are not in the examples.
 3. NEVER use deprecated Scenic syntax - only use patterns shown in the examples.
 4. ONLY use CARLA blueprints that appear in the examples (e.g., vehicle.lincoln.mkz_2017, walker.pedestrian.0001).
@@ -205,8 +206,10 @@ def main():
 
         # 6. Save output
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        out_path = os.path.join(GENERATED_DIR, f"scenario_{timestamp}.scenic")
+        out_path = os.path.join(GENERATED_DIR, f"{timestamp}.scenic")
+
         with open(out_path, 'w') as f:
+            f.write(f"# SCENARIO: {user_input} \n\n")
             f.write(generated_code)
         
         print(f"Success! Code saved to: {out_path}")
