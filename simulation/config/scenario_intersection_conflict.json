@@ -1,0 +1,65 @@
+{
+  "map": "Town05",
+
+  "scenario": {
+    "type": "intersection_conflict",
+    "description": "Adversary spawns on a perpendicular road (junction_cross) and drives straight through the junction, T-boning ego"
+  },
+
+  "loop": {
+    "episode_duration_seconds": 20,
+    "intermission_seconds": 1,
+    "max_episodes": 999
+  },
+
+  "ego": {
+    "blueprint": "vehicle.lincoln.mkz_2017",
+    "spawn": { "mode": "random" },
+    "behavior": {
+      "type": "ttc_brake",
+      "target_speed": 8.0,
+      "brake_intensity": 1.0,
+      "ttc_threshold": 3.5,
+      "maneuver": "straight"
+    },
+    "sensors": []
+  },
+
+  "adversaries": [
+    {
+      "id": "adv_0",
+      "type": "vehicle",
+      "blueprint": "vehicle.tesla.model3",
+      "spawn": {
+        "mode": "junction_cross",
+        "search_distance": 80,
+        "approach_distance": 30
+      },
+      "behavior": {
+        "type": "intersection_conflict",
+        "speed_pct": -40,
+        "ignore_lights": true,
+        "auto_lane_change": false
+      }
+    }
+  ],
+
+  "environment": {
+    "weather": "ClearNoon",
+    "traffic_lights": "force_green"
+  },
+
+  "display": {
+    "enabled": true,
+    "camera": "behind"
+  },
+
+  "termination": {
+    "max_distance_from_start": 80,
+    "end_on_collision": true
+  },
+
+  "postconditions": [
+    { "type": "no_collision" }
+  ]
+}

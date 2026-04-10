@@ -1,0 +1,26 @@
+{
+  "map": "Town05",
+  "ego": {
+    "blueprint": "vehicle.lincoln.mkz_2017",
+    "speed_range": [8, 12],
+    "distance_to_intersection": [15, 25],
+    "safety_distance": [8, 12],
+    "brake_intensity": 1.0
+  },
+  "adversary": {
+    "blueprint": "vehicle.tesla.model3",
+    "speed_range": [10, 14],
+    "distance_to_intersection": [15, 20]
+  },
+  "scenario": {
+    "type": "3_way_intersection_conflict",
+    "ego_maneuver": "straight",
+    "adversary_maneuver": "left_turn"
+  },
+  "environment": {
+    "traffic_lights": "force_green"
+  },
+  "termination": {
+    "max_distance_from_start": 80
+  }
+}

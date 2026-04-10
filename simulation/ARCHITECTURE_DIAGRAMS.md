@@ -1,0 +1,332 @@
+# Architecture Diagram
+
+## System Components
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     carla_runner.py                             │
+│                    (Clean Entry Point)                          │
+│                                                                 │
+│  • CLI argument parsing (--config, --host, --port)            │
+│  • Configuration validation                                    │
+│  • Error handling with helpful messages                        │
+│  • Delegates to runner module                                  │
+│                                                                 │
+│  Usage: python carla_runner.py --config config.json            │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+        ┌────────────────────────────────────────────┐
+        │      runner/__init__.py                     │
+        │   (Exports: run() function)                │
+        └────────────────┬─────────────────────────┘
+                         │
+                         ▼
+    ┌────────────────────────────────────────────────────┐
+    │           runner/episode.py                        │
+    │      (Main Orchestrator, Episode Loop)            │
+    │                                                    │
+    │  • Coordinates all modules                        │
+    │  • Manages episode lifecycle                      │
+    │  • Handles user input (ESC, N, TAB)              │
+    │  • Ensures termination conditions                │
+    └──────┬──────────┬──────────┬──────────┬───────────┘
+           │          │          │          │
+    ┌──────▼──┐  ┌───▼──────┐  │   ┌────▼──────┐
+    │ config  │  │connection│  │   │world_setup│
+    │  .py    │  │   .py    │  │   │   .py     │
+    │         │  │          │  │   │           │
+    │ Load    │  │Connect   │  │   │ Set       │
+    │ config  │  │to CARLA  │  │   │ weather  │
+    │ files   │  │Configure │  │   │traffic   │
+    │         │  │sync mode │  │   │ lights   │
+    └─────────┘  └──────────┘  │   └───────────┘
+                               │
+        ┌──────────────────────┼──────────────────────┐
+        │                      │                      │
+    ┌───▼────┐  ┌──────▼────┐  │  ┌──────▼──────┐
+    │ spawn  │  │ behavior  │  │  │  sensors    │
+    │  .py   │  │   .py     │  │  │   .py       │
+    │        │  │           │  │  │             │
+    │ Spawn  │  │ OOP       │  │  │ Collision   │
+    │ actors │  │ Controllers   │  │ monitoring  │
+    │ with   │  │           │  │  │ RGB camera  │
+    │ retry  │  │ - TM      │  │  │ LiDAR       │
+    │        │  │ - Conflict│  │  │             │
+    │        │  │ - TTCBrake│  │  │             │
+    │        │  │ - CutIn   │  │  │             │
+    └────────┘  │ - Custom  │  │  └─────────────┘
+                └───────────┘  │
+                               │
+        ┌──────────────────────┼──────────────────────┐
+        │                      │                      │
+    ┌───▼───────────┐  ┌───────▼────┐  ┌────▼──────┐
+    │ termination   │  │visualization│  │  utils    │
+    │   .py         │  │    .py      │  │   .py     │
+    │               │  │             │  │           │
+    │ Check end     │  │ Render HUD  │  │ Speed calc│
+    │ conditions:   │  │ RGB views   │  │ TTC calc  │
+    │ - Duration    │  │ LiDAR BEV   │  │ Steering  │
+    │ - Collision   │  │ Pygame UI   │  │ Throttle  │
+    │ - Off-road    │  │             │  │           │
+    │ - Custom      │  │             │  │           │
+    └───────────────┘  └─────────────┘  └───────────┘
+```
+
+## Data Flow
+
+```
+User Input
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│  carla_runner.py (CLI)                  │
+│  • Parse args                           │
+│  • Validate config                      │
+│  • Handle errors                        │
+└──────────────┬──────────────────────────┘
+               │ config_path, host, port
+               ▼
+┌─────────────────────────────────────────┐
+│  runner.episode.run()                   │
+│  • Coordinate modules                   │
+│  • Manage episode loop                  │
+└──────────────┬──────────────────────────┘
+               │
+      ┌────────┼────────┬────────┬───────┐
+      │        │        │        │       │
+      ▼        ▼        ▼        ▼       ▼
+   CONFIG  CONNECTION WORLD   SPAWN  BEHAVIOR
+   .py      .py       SETUP   .py      .py
+            │         .py     │        │
+      ┌─────┴────┐      │     │        │
+      │          │      │     │        │
+      ▼          ▼      ▼     ▼        ▼
+    CARLA      CARLA   Env  Actors   Commands
+    Server   Synchronous   Setup
+              Mode
+              
+              │
+              ▼
+    ┌──────────────────────┐
+    │ Simulation Loop      │
+    │ (Each tick)          │
+    │                      │
+    │ 1. World.tick()      │
+    │ 2. Get sensor data   │
+    │ 3. Update behaviors  │
+    │ 4. Check termination │
+    │ 5. Render HUD        │
+    │ 6. Handle input      │
+    └──────────────────────┘
+              │
+              ▼
+    ┌──────────────────────┐
+    │ Cleanup              │
+    │                      │
+    │ • Destroy actors     │
+    │ • Stop sensors       │
+    │ • Restore world      │
+    └──────────────────────┘
+```
+
+## Class Hierarchy
+
+```
+VehicleBehaviorController (Abstract Base)
+│
+├── TrafficManagerController
+│   └── Uses CARLA Traffic Manager for autopilot
+│
+├── IntersectionConflictController
+│   └── Specialized for T-bone scenarios
+│
+├── TTCBrakeController
+│   └── Brakes based on Time-to-Collision
+│
+├── ConstantSpeedController
+│   └── Maintains fixed speed along waypoints
+│
+├── CutInController
+│   └── Cut-in lane change maneuver
+│
+└── SuddenBrakeController
+    └── Full brake after delay
+
+WalkerBehaviorController (Pedestrian Base)
+│
+└── BasicWalkerController
+    └── Navigation to target locations
+
+────────────────────────────────────────
+
+Composed Classes:
+
+CollisionMonitor
+│
+└── Tracks vehicle-vehicle and vehicle-terrain collisions
+
+WaypointPlanner
+│
+└── Pre-computes road-following waypoint paths
+```
+
+## Configuration to Execution Flow
+
+```
+┌──────────────────────────┐
+│  config.json             │
+│  ├─ map: Town05          │
+│  ├─ scenario: {...}      │
+│  ├─ ego: {...}           │
+│  ├─ adversaries: [...]   │
+│  ├─ environment: {...}   │
+│  ├─ termination: {...}   │
+│  └─ loop: {...}          │
+└──────────────┬───────────┘
+               │ config.py::load_config()
+               ▼
+       ┌────────────────────┐
+       │  Config (dict)     │
+       └────────┬───────────┘
+                │
+      ┌─────────┼─────────┬──────────┬────────────┐
+      │         │         │          │            │
+      ▼         ▼         ▼          ▼            ▼
+   connection world_setup spawn   behavior   termination
+    .py        .py        .py       .py         .py
+      │         │         │         │            │
+      ▼         ▼         ▼         ▼            ▼
+   Client    Weather   Actors   Controllers   Checkers
+   World     Lights    Sensors  Waypoints     Duration
+   Sync                         Commands      Collision
+                                             Custom
+      │         │         │         │            │
+      └─────────┴─────────┴─────────┴────────────┘
+                        │
+                        ▼
+            ┌───────────────────────┐
+            │  Simulation Running   │
+            │  (episode.py)         │
+            │                       │
+            │  Loop:                │
+            │  • Tick CARLA         │
+            │  • Update behaviors   │
+            │  • Collect sensors    │
+            │  • Check termination  │
+            │  • Render             │
+            │                       │
+            │  Until:               │
+            │  • Collision          │
+            │  • Timeout            │
+            │  • User quit          │
+            └─────────────────┬──────┘
+                              │
+                              ▼
+                        ┌────────────────┐
+                        │  Episode Done  │
+                        │  Output Stats  │
+                        │  Cleanup       │
+                        └────────────────┘
+```
+
+## Module Interactions (Simplified)
+
+```
+┌─────────────────────────────────────┐
+│         episode.py (Orchestrator)   │
+│    ┌───────────────────────────┐    │
+│    │  _run_one_episode()       │    │
+│    │                           │    │
+│    │  Calls:                   │    │
+│    │  • spawn.safe_spawn_...() │    │
+│    │  • sensors.attach_...()   │    │
+│    │  • behavior.Controller()  │    │
+│    │  • termination.Checker()  │    │
+│    └───────────────────────────┘    │
+│           │   │   │   │              │
+│    ┌──────▼───▼───▼───▼──────┐      │
+│    │  Simulation Loop        │      │
+│    │                         │      │
+│    │  world.tick()           │      │
+│    │  ├─ query.get_sensors() │      │
+│    │  ├─ ctrl.tick()         │      │
+│    │  ├─ check.should_term() │      │
+│    │  └─ render.display()    │      │
+│    └──────────────────────────┘      │
+│           │   │   │   │              │
+└───────────┼───┼───┼───┼──────────────┘
+            │   │   │   │
+      ┌─────▼─┐ │   │   └──────┬──────────┐
+      │sensors│ │   │          │          │
+      │.py    │ │   │          │          │
+      │       │ │   │          │          │
+      │RGB   │ │   │      ┌────▼──┐  ┌──▼────┐
+      │Lidar │ │   │      │visual.│  │termina│
+      └─────┘ │   │      │py     │  │tion   │
+            ┌─▼─┐ │      └───────┘  │.py    │
+            │beh│ │                 └────┐──┘
+            │avi│ │      ┌─────┐        │
+            │or.│ │      │utils│◄───────┘
+            │py │ │      │.py  │
+            └───┘ │      └─────┘
+                  │
+              ┌───▼────┐
+              │ spawn  │
+              │  .py   │
+              │        │
+              │(retries)
+              └────────┘
+```
+
+## Decision Tree: Behavior Selection
+
+```
+                    ┌──────────────────┐
+                    │  config["ego"]   │
+                    │  ["behavior"]    │
+                    │  ["type"]        │
+                    └────────┬─────────┘
+                             │
+          ┌──────────────────┼──────────────────┐
+          │                  │                  │
+     ┌────▼────┐     ┌──────▼──────┐    ┌────▼──────┐
+     │"traffic │     │"intersection│    │"ttc_brake"│
+     │_manager"│     │_conflict"   │    │           │
+     │         │     │             │    │           │
+     │Uses TM  │     │Custom path  │    │Waypoint   │
+     │autopilot│     │forcing into │    │following  │
+     │         │     │junction     │    │+ TTC check│
+     └────┬────┘     └──────┬──────┘    └────┬──────┘
+          │                 │                │
+          └─────────────────┼────────────────┘
+                            │
+          ┌─────────────────┼─────────────────┐
+          │                 │                 │
+     ┌────▼─────┐      ┌───▼────┐      ┌────▼────┐
+     │"constant │      │"cut_in"│      │"sudden  │
+     │_speed"   │      │        │      │_brake"  │
+     │          │      │        │      │         │
+     │Fixed     │      │Steer   │      │Brake    │
+     │speed     │      │into    │      │after    │
+     │waypoint  │      │ego     │      │delay    │
+     │following │      │lane    │      │         │
+     └────┬─────┘      └───┬────┘      └────┬────┘
+          │                 │                │
+          └─────────────────┼────────────────┘
+                            │
+                   ┌────────▼────────┐
+                   │ Instantiate and │
+                   │ return          │
+                   │ controller      │
+                   │ instance        │
+                   └─────────────────┘
+```
+
+---
+
+This architecture enables:
+- ✅ Easy testing (each module independently)
+- ✅ Clear responsibility boundaries
+- ✅ Straightforward extension (add new behavior classes)
+- ✅ Maintainable codebase (well-organized, commented)

@@ -1,0 +1,65 @@
+{
+  "map": "Town03",
+
+  "scenario": {
+    "type": "pedestrian_crossing",
+    "description": "Pedestrian crosses road perpendicular to ego at intersection"
+  },
+
+  "ego": {
+    "blueprint": "vehicle.lincoln.mkz_2017",
+    "spawn": { "mode": "random" },
+    "behavior": {
+      "type": "ttc_brake",
+      "target_speed": 8.0,
+      "brake_intensity": 1.0,
+      "ttc_threshold": 3.5,
+      "maneuver": "straight"
+    },
+    "sensors": [
+      {
+        "id": "front_camera",
+        "type": "sensor.camera.rgb",
+        "transform": { "x": 1.5, "y": 0.0, "z": 1.4 },
+        "attributes": { "image_size_x": 1280, "image_size_y": 720, "fov": 90 }
+      }
+    ]
+  },
+
+  "adversaries": [
+    {
+      "id": "pedestrian_0",
+      "type": "walker",
+      "blueprint": "walker.pedestrian.0001",
+      "spawn": {
+        "mode": "relative_to_ego",
+        "direction": "front",
+        "distance": 25,
+        "lateral_offset": -4
+      },
+      "behavior": {
+        "type": "walk_across",
+        "target_speed": 1.4,
+        "direction": "right"
+      }
+    }
+  ],
+
+  "environment": {
+    "weather": "ClearNoon",
+    "traffic_lights": "force_green"
+  },
+
+  "display": { "enabled": true, "camera": "behind" },
+
+  "termination": {
+    "max_distance_from_start": 60,
+    "max_duration_seconds": 45,
+    "end_on_collision": true
+  },
+
+  "postconditions": [
+    { "type": "no_collision" },
+    { "type": "ego_speed_below", "value": 1.0 }
+  ]
+}
