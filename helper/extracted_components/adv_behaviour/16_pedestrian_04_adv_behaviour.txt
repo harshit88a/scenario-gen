@@ -1,9 +1,0 @@
-from scenic.simulators.carla.behaviors import CrossingBehavior
-from scenic.domains.driving.roads import ManeuverType
-
-param EGO_SPEED = 9
-param PED_SPEED = 1.5
-param TRIGGER_DIST = 12
-
-behavior EgoBehavior(trajectory):
-    do FollowTrajectoryBehavior(target_speed=globalParameters.EGO_SPEED, trajectory=trajectory)
