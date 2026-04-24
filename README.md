@@ -1,116 +1,209 @@
-## Project - Scenario Generation
+# CARLA Adversarial Scenario Generator
 
+A fine-tuned Qwen2.5-Coder-7B model that converts natural-language descriptions into validated CARLA scenario JSON configurations. Describe a driving scenario in plain English, and the pipeline produces a ready-to-run config file for your CARLA simulation.
 
-**Topic: Next Generation Autonomous Vehicle Scenario Generation - Enhancing Safety and Robustness with LLM Driven Solution**
+---
 
+## Requirements
 
-### INTRODUCTION
+### Hardware
 
-Autonomous Vehicle perception models can fail under adversarial perturbations with dangerous consequences. For example, by attaching a subtle sticker on a stop sign, an AV can misinterpret it as something else like a Speed Limit 80 sign, which can lead to accidents. Exhaustive testing in the real world is costly and involves extensive data collection, which is impractical. So, simulated scenarios generation is needed. 
+- GPU with at least 8 GB VRAM (tested on RTX 3070 8 GB)
+- CUDA 11.8 or 12.1
 
-Current methods produce only limited scenario types, and often encounter obstacles, such as generation of non-executable code or calls to APIs that do not exist, primarily due to scarcity of code examples. LLMs contain a broad real-world knowledge that we can use to describe diverse safety-critical situations. 
+### Software
 
-The goal of this project is to use the capabilities of LLMs to bridge the gap between textual scenario descriptions and executable CARLA simulations. Basically, we are trying to generate Scenic code using Retrieval Augmented Generation (RAG) of code snippets database and then simulate it in CARLA. This idea is derived from the Paper - ChatScene which was published in the CVPR conference in May 2024.
-
-### Recommended Stack
-
-- Python 3.8.x (works with 3.10)
-- Scenic 3.x
+- Ubuntu 20.04 or 22.04
+- Python 3.10 or newer
 - CARLA 0.9.15
 
-### Environment + Installation Checklist
+---
 
-1) Update and install Python 3.8
-```Bash
-sudo apt update
-sudo apt install python3.8 python3.8-venv python3.8-dev
+## Installing CARLA 0.9.15
+
+Download the prebuilt package from the CARLA releases page and extract it:
+
+```bash
+# Download (adjust the URL to the correct release asset)
+wget https://carla-releases.s3.us-east-005.backblazeb2.com/Linux/CARLA_0.9.15.tar.gz
+
+tar -xzf CARLA_0.9.15.tar.gz -C CARLA_0.9.15/
 ```
 
-2) Create the environment using the specific 3.8 binary and activate it
-```Bash
-python3.8 -m venv ~/chatscene_env
-source ~/chatscene_env/bin/activate  # need to run everytime when starting a new terminal
+Install the CARLA Python client library into your environment:
+
+```bash
+pip install CARLA_0.9.15/PythonAPI/carla/dist/carla-0.9.15-cp3*-linux-x86_64.whl
 ```
 
-3) Verify it is correct
-```Bash
-python --version
-# Output should be: Python 3.8.x
-```
+Verify the server starts without errors:
 
-4) Upgrade pip + wheel (inside chatscene virtual env)
-```Bash
-pip install --upgrade pip setuptools wheel
-```
-
-5) Install Scenic
-```Bash
-pip install scenic
-```
-
-6) Install the CARLA Python client that matches the CARLA binary
-```Bash
-pip install carla==0.9.15
-```
-
-### Download and install CARLA 0.9.15
-
-1) Go to https://github.com/carla-simulator/carla/releases/tag/0.9.15/ and download Ubuntu Carla 0.9.15 tar file and extract it in the project folder.
-
-2) Now go to the CARLA folder and run the Carla server in a new terminal.
-```Bash
-cd ~/CARLA_0.9.15
+```bash
+cd CARLA_0.9.15
 ./CarlaUE4.sh -prefernvidia
 ```
 
-3) Run ```python3 test_connection.py``` (in the helper folder). The output should look like this:
+You should see the Unreal Engine window open and stay stable. This first boot can take 30–60 seconds.
 
-![test connection screenshot](screenshots/test_connection-result.png)
+---
 
+## Python Dependencies
 
-### Install other python packages
+Install PyTorch first, matching your CUDA version. Only one of these lines is needed:
 
-```Bash
-pip install sentence-transformers 
-pip install google-genai numpy scikit-learn torch
+```bash
+# CUDA 12.1
+pip install torch==2.4.0 --index-url https://download.pytorch.org/whl/cu121
+
+# CUDA 11.8
+pip install torch==2.4.0 --index-url https://download.pytorch.org/whl/cu118
 ```
 
-### How to run and simulate Scenic code?
+Then install the remaining dependencies:
 
-1. Make sure that CARLA 0.9.15 is installed and extracted.
-
-2. Run the CARLA simulator by ```./CarlaUE4.sh -prefernvidia```
-
-3. Run the Scenic code by:
-
-```Bash
-scenic sample.scenic --simulate --time 200
+```bash
+pip install -r requirements.txt
 ```
 
-- ```--simulate``` component tells scenic to execute dynamic behaviour. Without this the scenic only generates the initial state but does not simulate in CARLA.
+The `requirements.txt` installs:
 
-- ```--time 200``` component sets the maximum duration of the simulation. Here 200 means the simulation will run for 20 seconds.
+| Package | Purpose |
+|---|---|
+| `transformers>=4.45.0` | Model loading and tokenizer |
+| `peft>=0.12.0` | LoRA adapter support |
+| `bitsandbytes>=0.46.1` | 4-bit NF4 quantization |
+| `accelerate>=0.33.0` | Required by `device_map="auto"` in transformers |
 
+---
 
-### Results
+## Project Layout
 
-1. **Scenario:** A pedestrian appears out of nowhere and crosses the road while an ego vehicle approaches.
+```
+scenario-gen/
+├── generate_config.py          # LLM inference — reads a prompt, writes a JSON
+├── validator.py                # Schema validation for generated configs
+├── carla_runner.py             # CARLA client — runs a config against the simulator
+├── requirements.txt            # Python dependencies (see above)
+├── qwen7b_json_lora_final/     # LoRA adapter (unzip here before first run)
+├── hf_cache/                   # HuggingFace model cache (auto-created on first run)
+├── generated_config/           # Output directory for generated JSON configs
+└── config-examples/            # Reference configs used for training
+```
 
-<p float="left">
-  <img src="screenshots/s1(1).gif" width="45%" />
-  <img src="screenshots/s1(2).gif" width="45%" /> 
-</p>
+---
 
-2. **Scenario:** A pedestrian appears out of nowhere and starts crossing the road when the ego vehicle turns left in a 4-way intersection.
+## One-Time Setup
 
-<p float="left">
-  <img src="screenshots/s2(1).gif" width="45%" />
-  <img src="screenshots/s2(2).gif" width="45%" /> 
-</p>
+Download and unzip the LoRA adapter into the project directory:
 
-3. **Scenario:** The ego vehicle is following an adversarial car and it suddenly breaks causing collision with the ego vehicle.
+```bash
+unzip qwen7b_json_lora_final.zip
+```
 
-<p float="left">
-  <img src="screenshots/s3(1).gif" width="45%" />
-  <img src="screenshots/s3(2).gif" width="45%" /> 
-</p>
+After unzipping, `./qwen7b_json_lora_final/adapter_model.safetensors` must exist.
+
+The first run will also download the Qwen2.5-Coder-7B base model weights (~15 GB) into `./hf_cache/`. Subsequent runs load from cache and start in about 30 seconds.
+
+---
+
+## Workflow
+
+The pipeline has three independent pieces with different lifetimes. Run them in separate terminals.
+
+### Terminal 1 — Generate the JSON
+
+```bash
+python3 generate_config.py
+```
+
+The script prompts you to describe the scenario. Type the description (multi-line is fine), then press `Ctrl-D` to submit. The JSON is written to `generated_config/config_<timestamp>.json` and the process exits immediately, fully releasing VRAM.
+
+Example input:
+
+```
+A vehicle in the left adjacent lane abruptly cuts into the ego's lane at
+highway speed with minimal gap, forcing an emergency brake from the ego.
+```
+
+Optional flags:
+
+```
+--adapter-dir   Path to the LoRA adapter folder   (default: ./qwen7b_json_lora_final)
+--cache-dir     HuggingFace cache directory        (default: ./hf_cache)
+--max-retries   Re-sample attempts on failure      (default: 3)
+--temperature   Sampling temperature               (default: 0.2)
+--max-new-tokens  Token budget for generation      (default: 1500)
+```
+
+### Terminal 2 — Start CARLA
+
+You can start CARLA in parallel with Terminal 1. The UE4 boot takes time and you do not want it on the critical path.
+
+```bash
+cd CARLA_0.9.15
+./CarlaUE4.sh -prefernvidia
+```
+
+### Terminal 3 — Run the Scenario
+
+```bash
+python3 carla_runner.py --config generated_config/config_20260101_120000.json
+```
+
+If CARLA crashes mid-episode, re-run this command against the same JSON without regenerating.
+
+---
+
+## How Validation Works
+
+`generate_config.py` calls `validator.py` automatically after each generation attempt. If validation fails, the generator re-samples with a slightly higher temperature (up to `--max-retries` times). By the time a file is written to disk, it has already passed:
+
+- Required top-level keys (`map`, `scenario`, `ego`, `adversaries`)
+- Valid CARLA map names
+- Valid spawn modes, behavior types, and adversary types
+- Behavior/type consistency (`walk_across` is only valid on a walker, never a vehicle)
+- Correct JSON types (`adversaries` must be a list, not an object)
+
+The validator does not check numeric ranges or cross-field semantics. The real authority on whether a config will run is `carla_runner.py`.
+
+You can also validate any config file by hand:
+
+```bash
+python3 validator.py generated_config/config_20260101_120000.json
+```
+
+---
+
+## Why Three Terminals Instead of One Pipeline Script
+
+The three components have very different lifetimes:
+
+- **Generator** is one-shot. Load model, generate, exit. Roughly 30–60 seconds total.
+- **Simulator** is long-lived. UE4 boot is slow; you want to keep it running across many scenarios.
+- **Runner** is per-scenario. When CARLA OOM-crashes (it happens on 8 GB cards), you want to re-run the runner against the same JSON, not regenerate everything from scratch.
+
+Coupling them means a CARLA crash kills an LLM session you no longer need to redo, and you serialize the slow UE4 boot behind the LLM that could have run in parallel. Decoupling also means `del model; torch.cuda.empty_cache()` is not enough to free VRAM — the CUDA context and PyTorch allocator stay resident until process exit. Process exit is the only guarantee on 8 GB cards.
+
+To verify VRAM is being released, run `watch -n 0.5 nvidia-smi` in a side terminal. You should see VRAM climb to ~5.5 GB during generation, then drop to near zero when the script exits, then climb again as CARLA loads.
+
+---
+
+## Supported Config Values
+
+These are the values the validator accepts. The model has been trained to use them.
+
+**Maps:** `Town01`, `Town02`, `Town03`, `Town04`, `Town05`, `Town06`, `Town07`, `Town10HD`, `Town11`, `Town12`
+
+**Adversary types:** `vehicle`, `walker`, `prop`
+
+**Spawn modes:** `random`, `random_lane`, `index`, `coordinates`, `near_intersection`, `nearby_random`, `relative_to_ego`, `relative_to_actor`, `lane_ahead`, `junction_cross`
+
+**Vehicle behaviors:** `follow_lane`, `lane_change`, `cut_in`, `sudden_brake`, `constant_speed`, `ttc_brake`, `intersection_conflict`, `traffic_manager`, `autopilot`, `stopped`, `parked`
+
+**Walker behaviors:** `walk_across`, `walk_to`, `stationary`
+
+**Weather presets:** `ClearNoon`, `CloudyNoon`, `WetNoon`, `WetCloudyNoon`, `SoftRainNoon`, `MidRainyNoon`, `HardRainNoon`, `ClearSunset`, `CloudySunset`, `WetSunset`, `WetCloudySunset`, `SoftRainSunset`, `MidRainSunset`, `HardRainSunset`, `ClearNight`, `CloudyNight`, `WetNight`, `WetCloudyNight`, `SoftRainNight`, `MidRainyNight`, `HardRainNight`, `FoggyNoon`, `FoggySunset`, `FoggyNight`
+
+**Traffic lights:** `normal`, `force_green`, `default`
+
+**Cameras:** `behind`, `top`, `lidar`

@@ -1,9 +1,0 @@
-param ADV_SPEED = Range(0, 10)
-param ADV_DISTANCE = Range(10, 20) 
-param BRAKE_FORCE = Range(0.5, 1)  
-
-behavior AdvBehavior(target_ego, brake_intensity):
-    do FollowLaneBehavior(target_speed=globalParameters.ADV_SPEED) until \
-        (distance from target_ego to self) < globalParameters.ADV_DISTANCE
-    while True:
-        take SetBrakeAction(brake_intensity)

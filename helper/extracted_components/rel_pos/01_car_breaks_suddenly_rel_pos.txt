@@ -1,4 +1,0 @@
-param GEO_Y_DISTANCE = Range(15, 30) 
-adv_spot = new OrientedPoint following roadDirection from EgoSpawnPt for globalParameters.GEO_Y_DISTANCE
-advAgent = new Car at adv_spot offset by (0, 0, 0.5),
-    with behavior AdvBehavior(ego, globalParameters.BRAKE_FORCE)

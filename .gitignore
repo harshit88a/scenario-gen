@@ -1,6 +1,10 @@
 /CARLA_0.9.15
 /test
+/archived
+/config-examples
+/generated_config
+/hf_cache
+/qwen7b_json_lora_final
 /prompt
 
-
-
+.claude

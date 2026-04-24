@@ -1,8 +1,0 @@
-from scenic.simulators.carla.behaviors import CrossingBehavior
-
-param EGO_SPEED = 10
-param PED_SPEED = 2.0
-param TRIGGER_DIST = 15
-
-behavior EgoBehavior(target_speed):
-    do FollowLaneBehavior(target_speed=target_speed)

@@ -1,5 +1,0 @@
-param map = localPath('./../CARLA_0.9.15/CarlaUE4/Content/Carla/Maps/OpenDrive/Town05.xodr')
-param carla_map = 'Town05'
-param use2DMap = True
-model scenic.simulators.carla.model
-EGO_MODEL = "vehicle.lincoln.mkz_2017"
