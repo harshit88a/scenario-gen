@@ -81,7 +81,7 @@ Examples:
         print("\n[Interrupted] User terminated the simulation.")
         sys.exit(0)
     except FileNotFoundError as e:
-        print(f"[Error] Configuration file not found: {args.config}")
+        print(f"[Error] Configuration file not found: {args.config} ({e})")
         sys.exit(1)
     except ConnectionError as e:
         print(f"[Error] Failed to connect to CARLA server at {args.host}:{args.port}")

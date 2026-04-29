@@ -13,6 +13,7 @@ lists in your boilerplate.json.
 from __future__ import annotations
 
 import json
+import sys
 from typing import Any
 
 
@@ -26,7 +27,7 @@ VALID_MAPS = {
 VALID_SPAWN_MODES = {
     "random", "random_lane", "index", "coordinates", "near_intersection",
     "nearby_random", "relative_to_ego", "lane_ahead", "junction_cross",
-    "relative_to_actor",
+    "relative_to_actor", "oncoming_junction", "exit_lane_ahead",
 }
 
 VALID_EGO_BEHAVIORS = {
@@ -38,6 +39,7 @@ VALID_VEHICLE_BEHAVIORS = {
     "traffic_manager", "intersection_conflict", "follow_lane",
     "constant_speed", "ttc_brake", "cut_in", "sudden_brake",
     "stopped", "parked", "autopilot", "lane_change",
+    "sudden_accelerate", "sudden_turn",
 }
 
 VALID_WALKER_BEHAVIORS = {"walk_across", "walk_to", "stationary"}
@@ -55,7 +57,7 @@ VALID_WEATHER = {
     "FoggyNoon", "FoggySunset", "FoggyNight",
 }
 
-VALID_TRAFFIC_LIGHTS = {"normal", "force_green", "default"}
+VALID_TRAFFIC_LIGHTS = {"normal", "force_green", "force_red"}
 VALID_CAMERAS = {"behind", "top", "lidar"}
 
 
@@ -191,7 +193,6 @@ def validate_config(cfg: Any) -> tuple[bool, list[str]]:
 
 
 def main() -> int:
-    import sys
     if len(sys.argv) != 2:
         print("usage: validator.py <config.json>", file=sys.stderr)
         return 2
@@ -208,5 +209,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    import sys
     sys.exit(main())

@@ -124,10 +124,18 @@ def _run_one_episode(
             sensor_actors.append(s)
 
         # ── Adversaries ──────────────────────────────────────────────────
+        # Two-pass spawn: vehicles/props first so walkers that use
+        # relative_to_actor can always resolve their reference regardless
+        # of the order entries appear in the config.
         adversaries:  list = []
         adv_ctrls:    list = []
         named_actors: dict = {}   # id → actor, for reference-based spawns
-        for adv_cfg in config.get("adversaries", []):
+
+        all_adv_cfgs = config.get("adversaries", [])
+        non_walkers  = [c for c in all_adv_cfgs if c.get("type") != "walker"]
+        walkers      = [c for c in all_adv_cfgs if c.get("type") == "walker"]
+
+        for adv_cfg in non_walkers + walkers:
             adv_tf = _resolve_spawn(
                 adv_cfg.get("spawn", {"mode": "nearby_random"}),
                 world, cmap, sps,
@@ -154,10 +162,17 @@ def _run_one_episode(
             else:
                 adv  = safe_spawn_vehicle(world, bpl, adv_cfg["blueprint"], adv_tf)
                 vehicle_actors.append(adv)
+                adv_beh       = adv_cfg.get("behavior", {})
+                adv_target_id = adv_beh.get("target_id")
+                adv_target    = (
+                    named_actors.get(adv_target_id)
+                    if adv_target_id and adv_target_id in named_actors
+                    else ego
+                )
                 ctrl = VehicleBehaviorController(
-                    adv, adv_cfg.get("behavior", {}),
+                    adv, adv_beh,
                     cmap,
-                    target_actor=ego,
+                    target_actor=adv_target,
                     tm=tm,
                 )
                 adv_ctrls.append(ctrl)
@@ -170,8 +185,9 @@ def _run_one_episode(
         # In synchronous mode actor positions are only valid after a tick
         world.tick()
 
+        ordered_adv_cfgs = non_walkers + walkers
         for i, (adv_cfg, adv) in enumerate(
-            zip(config.get("adversaries", []), adversaries)
+            zip(ordered_adv_cfgs, adversaries)
         ):
             dist = ego.get_location().distance(adv.get_location())
             loc  = adv.get_location()
@@ -183,11 +199,18 @@ def _run_one_episode(
                 )
 
         # ── Ego behavior ─────────────────────────────────────────────────
+        ego_beh       = ego_cfg.get("behavior", {"type": "ttc_brake", "target_speed": 10})
+        ego_target_id = ego_beh.get("target_id")
+        ego_target    = (
+            named_actors.get(ego_target_id)
+            if ego_target_id and ego_target_id in named_actors
+            else (adversaries[0] if adversaries else None)
+        )
         ego_ctrl = VehicleBehaviorController(
             ego,
-            ego_cfg.get("behavior", {"type": "ttc_brake", "target_speed": 10}),
+            ego_beh,
             cmap,
-            target_actor=adversaries[0] if adversaries else None,
+            target_actor=ego_target,
             tm=tm,
         )
 

@@ -45,8 +45,25 @@ SYSTEM_PROMPT = (
     "implements the described scenario. The JSON must include map, scenario, "
     "loop, ego, adversaries, environment, display, termination, and "
     "postconditions fields as appropriate. Output ONLY the JSON object — no "
-    "explanation, no markdown fences, no commentary before or after."
+    "explanation, no markdown fences, no commentary before or after.\n\n"
 )
+
+
+# Map of model hallucinations → valid equivalents for spawn modes.
+_SPAWN_MODE_ALIASES = {
+    "relative_to_vehicle": "relative_to_actor",
+    "relative_to_npc":     "relative_to_actor",
+    "relative_to_object":  "relative_to_actor",
+}
+
+
+def normalize_config(cfg: dict) -> dict:
+    """Fix well-known model hallucinations in-place before schema validation."""
+    for adv in cfg.get("adversaries", []):
+        spawn = adv.get("spawn")
+        if isinstance(spawn, dict) and isinstance(spawn.get("mode"), str):
+            spawn["mode"] = _SPAWN_MODE_ALIASES.get(spawn["mode"], spawn["mode"])
+    return cfg
 
 
 def extract_json(text: str) -> str:
@@ -178,6 +195,7 @@ def generate_and_validate(tok, model, prompt: str,
                 last_err = f"json.loads failed: {e}"
                 print(f"[gen] {last_err}", flush=True)
             else:
+                cfg = normalize_config(cfg)
                 ok, errs = validate_config(cfg)
                 if ok:
                     return cfg, None
@@ -193,6 +211,11 @@ def generate_and_validate(tok, model, prompt: str,
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--prompt", default=None,
+                    help="Scenario description. If omitted, read interactively from stdin.")
+    ap.add_argument("--out", default=None,
+                    help="Output JSON path. If omitted, writes to "
+                         "generated_config/config_<timestamp>.json.")
     ap.add_argument("--adapter-dir", default="./qwen7b_json_lora_final",
                     help="Path to the unzipped LoRA adapter folder.")
     ap.add_argument("--cache-dir", default="./hf_cache",
@@ -203,18 +226,21 @@ def main() -> int:
     ap.add_argument("--max-new-tokens", type=int, default=1500)
     args = ap.parse_args()
 
-    # Resolve the prompt from stdin.
-    print("=" * 72)
-    print(" CARLA Adversarial Scenario Generator")
-    print("=" * 72)
-    print("Describe the adversarial scenario (multi-line OK).")
-    print("Finish with Ctrl-D (Linux/macOS) or Ctrl-Z then Enter (Windows).\n",
-          flush=True)
-    try:
-        prompt = sys.stdin.read().strip()
-    except KeyboardInterrupt:
-        print("\nAborted.", file=sys.stderr)
-        return 1
+    # Resolve the prompt: CLI flag takes priority, otherwise interactive stdin.
+    if args.prompt:
+        prompt = args.prompt.strip()
+    else:
+        print("=" * 72)
+        print(" CARLA Adversarial Scenario Generator")
+        print("=" * 72)
+        print("Describe the adversarial scenario (multi-line OK).")
+        print("Finish with Ctrl-D (Linux/macOS) or Ctrl-Z then Enter (Windows).\n",
+              flush=True)
+        try:
+            prompt = sys.stdin.read().strip()
+        except KeyboardInterrupt:
+            print("\nAborted.", file=sys.stderr)
+            return 1
 
     if not prompt:
         print("Empty prompt — aborting.", file=sys.stderr)
@@ -227,10 +253,18 @@ def main() -> int:
         return 2
 
     os.makedirs(args.cache_dir, exist_ok=True)
-    out_dir = "generated_config"
-    os.makedirs(out_dir, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_path = os.path.join(out_dir, f"config_{timestamp}.json")
+
+    # Resolve output path: use --out if provided, otherwise auto-generate.
+    if args.out:
+        out_path = args.out
+        out_dir  = os.path.dirname(out_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+    else:
+        out_dir = "generated_config"
+        os.makedirs(out_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_path = os.path.join(out_dir, f"config_{timestamp}.json")
 
     tok, model = load_model(args.adapter_dir, args.cache_dir)
 

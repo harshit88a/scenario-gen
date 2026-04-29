@@ -13,9 +13,30 @@ def get_speed(actor) -> float:
 
 
 def compute_ttc(a, b) -> float:
-    """Estimate time-to-collision between two actors (seconds)."""
-    dist = a.get_location().distance(b.get_location())
-    return dist / max(get_speed(a) - get_speed(b), 0.01)
+    """
+    Estimate time-to-collision between two actors (seconds).
+
+    Projects the relative velocity of *a* w.r.t. *b* onto the unit vector
+    pointing from *a* to *b*.  Positive closing speed means the actors are
+    approaching each other; handles head-on and overtaking cases correctly.
+    Returns a large sentinel (999) when actors are moving apart.
+    """
+    a_loc = a.get_location()
+    b_loc = b.get_location()
+    dx = b_loc.x - a_loc.x
+    dy = b_loc.y - a_loc.y
+    dist = math.sqrt(dx ** 2 + dy ** 2)
+    if dist < 0.01:
+        return 0.0
+    # Unit vector from a toward b
+    ux, uy = dx / dist, dy / dist
+    # Closing speed: component of a's velocity minus b's velocity along separation axis
+    va = a.get_velocity()
+    vb = b.get_velocity()
+    closing_speed = (va.x - vb.x) * ux + (va.y - vb.y) * uy
+    if closing_speed <= 0.0:
+        return 999.0  # actors moving apart or parallel
+    return dist / closing_speed
 
 
 def steer_toward(actor, target: carla.Location):
@@ -39,7 +60,7 @@ def steer_toward(actor, target: carla.Location):
 
 def throttle_for_speed(actor, target_speed: float) -> float:
     """Simple P-controller throttle to reach *target_speed* (m/s)."""
-    return max(0.0, min(1.0, (target_speed - get_speed(actor)) * 0.4 + 0.3))
+    return max(0.0, min(1.0, (target_speed - get_speed(actor)) * 0.4))
 
 
 def walk_waypoints(wp, distance: float, step: float = 3.0):

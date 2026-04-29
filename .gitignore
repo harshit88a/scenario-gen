@@ -6,5 +6,9 @@
 /hf_cache
 /qwen7b_json_lora_final
 /prompt
+**/__pycache__/
+*.pyc
+*.pyo
 
 .claude
+
