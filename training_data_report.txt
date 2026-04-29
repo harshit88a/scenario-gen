@@ -1,0 +1,246 @@
+================================================================================
+ TRAINING DATA REPORT — CARLA Adversarial Scenario Generator
+ Generated using Claude AI
+ Model: Qwen2.5-Coder-7B fine-tuned with LoRA
+ Source: config-examples/ (244 JSON configs)
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 1. DATASET OVERVIEW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Total configs        : 244
+Scenario categories  : 22
+Multi-adversary      : 100 / 244  (41%)
+Single-adversary     : 144 / 244  (59%)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 2. SCENARIO CATEGORIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  intersection          26   Adversary crosses junction while ego goes straight;
+                             left/right turns; oncoming conflicts; red-light runners.
+
+  car_breaks_suddenly   20   Lead car brakes hard ahead of ego at varying speeds,
+                             distances, and weather conditions.
+
+  emergency_break       18   Ego must brake urgently — triggered by cones, stopped
+                             vehicles, or obstacles in the path, often with fog/rain.
+
+  pedestrian            19   Single pedestrian crosses ego's lane (various speeds,
+                             distances, spawn positions).
+
+  red_light             15   Adversary vehicle runs a red light and crosses the
+                             junction; ego goes straight.
+
+  wrong_way             11   Head-on wrong-way vehicle in ego's lane at varying
+                             speeds; ego must brake or hold position.
+
+  tailgate              11   Aggressive rear vehicle closes to near-zero gap;
+                             chain-collision risk when ego brakes.
+
+  lane_change           12   Adversary performs unsignalled lane change into ego's
+                             lane at various trigger distances.
+
+  cut_in_junction       12   Adversary cuts into ego's lane just before or inside
+                             a junction.
+
+  turn_obstacle         10   Obstacles (props or stopped walkers) block ego's turn
+                             path; motorcyclist false-crossing scenarios.
+
+  left_turn             10   Ego turns left; oncoming adversary conflicts.
+
+  right_turn            10   Ego turns right; crossing/oncoming adversary conflicts.
+
+  construction_zone     10   Cones and barriers narrow the lane; ego must slow and
+                             navigate a channelised single-track.
+
+  fog                   10   Dense fog conditions: pedestrians or vehicles appear
+                             at very close range (short detection window).
+
+  ego_loses_control     10   Slippery surfaces (wet/rain) with road debris;
+  (bad_weather)              tests grip-limit awareness.
+
+  st_obstacle            5   Pedestrian steps into lane and stops — static threat
+                             in ego's direct path.
+
+  multi_pedestrian       5   Group of 3-4 pedestrians crossing simultaneously;
+                             ego must stop fully.
+
+  cyclist_cut_in         5   Cyclist leaves bike lane and merges into ego's lane.
+
+  parking_pullout        5   Parked vehicle pulls out unsignalled into ego's lane.
+
+  pedestrian_occlusion   6   Pedestrian hidden behind a parked prop; appears
+                             suddenly at very close range.
+
+  junction_squeeze       7   Two adversaries enter a 4-way junction from crossing
+                             roads simultaneously, squeezing ego.
+
+  night                  7   Unlit pedestrians or vehicles in darkness;
+                             tests low-light detection limits.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 3. MAP COVERAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Town05    236 / 244  (97%)   ← heavily dominant
+  Town03      8 / 244  ( 3%)
+  All others  0
+
+  The model has seen almost exclusively Town05 geometry. Expect reduced
+  coherence of spawn-mode choices on Town01/02/04/06/07/10.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 4. WEATHER COVERAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ClearNoon       134  (55%)   ← majority of training is dry daytime
+  ClearNight       28  (11%)
+  HardRainNoon     17  ( 7%)
+  FoggyNoon        13  ( 5%)
+  CloudyNoon       15  ( 6%)
+  WetNoon          13  ( 5%)
+  WetCloudyNoon     5  ( 2%)
+  SoftRainNoon      4  ( 2%)
+  MidRainyNoon      3  ( 1%)
+  (none / missing)  7
+
+  GAPS: No sunset variants (WetSunset, CloudySunset, etc.) and no night-rain
+  combos (WetNight, HardRainNight) appear in training data at all, even though
+  the validator accepts them. Model is likely to ignore or hallucinate these.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 5. ADVERSARY TYPES AND BEHAVIORS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Adversary types (total instances across all configs):
+    vehicle   220
+    prop       92   (cones, barriers, boxes — always "static" behavior)
+    walker     76   (always "walk_across")
+
+  Vehicle behaviors seen:
+    sudden_brake         65
+    follow_lane          76   (walkers counted here too — actually walk_across)
+    sudden_brake         65
+    intersection_conflict 17
+    cut_in               17
+    parked               18
+    lane_change          14
+    sudden_turn           5
+    sudden_accelerate     5
+    traffic_manager       2
+    stopped               1
+
+  GAPS: sudden_turn and sudden_accelerate are underrepresented (5 each).
+  traffic_manager is nearly absent. walk_to and stationary walker behaviors
+  appear not to be in the training set at all.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 6. IDENTIFIED TRAINING GAPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  G1  Map monoculture  — 97% Town05; likely to generate Town05 even when
+                         another map is requested.
+
+  G2  No sunset weather — None of the 13 sunset presets appear. Model has
+                          no pattern for sunset scenarios.
+
+  G3  No night + rain   — Night scenarios exist (28) but all use ClearNight.
+                          Rain at night is completely unseen.
+
+  G4  Limited cyclists  — Only 5 cyclist_cut_in scenarios; model may struggle
+                          to produce cyclist-specific blueprints correctly.
+
+  G5  Rare behaviors    — sudden_turn (5) and sudden_accelerate (5) may be
+                          generated inconsistently or with wrong parameters.
+
+  G6  Walker variety    — All walkers use walk_across. The walk_to and
+                          stationary behaviors were never in training.
+
+  G7  No highway        — Town06 (highway) is absent; model likely cannot
+                          produce valid high-speed merge or overtake scenarios.
+
+  G8  No roundabout     — No explicit roundabout scenarios.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 7. SUGGESTED TEST PROMPTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ ── Core competency (should pass cleanly) ────────────────────────────────────
+
+ T01  "A car ahead brakes hard with no warning on a clear day. Ego is
+       following at 15 m/s and must stop in time."
+       Expected: car_breaks_suddenly / sudden_brake, ClearNoon, lane_ahead spawn.
+
+ T02  "A pedestrian runs across the road from the left 15 metres ahead while
+       ego drives straight at 12 m/s."
+       Expected: pedestrian / walk_across, nearby spawn, ttc_brake ego.
+
+ T03  "A vehicle runs a red light and crosses the junction from the right while
+       ego drives straight through a green light."
+       Expected: red_light / intersection_conflict, force_green lights.
+
+ T04  "Two cars enter a 4-way junction from both crossing roads simultaneously
+       while ego goes straight."
+       Expected: junction_squeeze, two adversaries with intersection_conflict.
+
+ T05  "A wrong-way car drives head-on toward ego at 20 m/s in rain."
+       Expected: wrong_way, HardRainNoon or WetNoon, oncoming_junction spawn.  ## wrong
+
+ ── Boundary / gap probing (expect degraded quality) ─────────────────────────
+
+ T06  "A cyclist cuts into ego's lane on a foggy sunset road."
+       [Gap G2 + G4] Sunset weather unseen; cyclist blueprint choice may fail.
+
+ T07  "A vehicle suddenly accelerates into ego's lane at a highway on-ramp
+       at night in heavy rain."
+       [Gap G1 + G3 + G5] Town06, ClearNight + rain, sudden_accelerate.
+       Likely defaults to Town05 and/or ignores rain.
+
+ T08  "A pedestrian stands frozen in the middle of the road at night in rain."
+       [Gap G3 + G6] walk_to / stationary walker + night + rain.
+       Model has no pattern for stationary walker in training.
+
+ T09  "Ego navigates a roundabout while a wrong-way vehicle enters the
+       roundabout from the exit."
+       [Gap G8] No roundabout training data.
+
+ T10  "Three cyclists cut in from the bike lane simultaneously in foggy
+       conditions."
+       [Gap G4] Multi-cyclist; model only saw 5 cyclist scenarios total.
+
+ ── Visualisation-friendly (good for a demo) ─────────────────────────────────
+
+ T11  "Construction zone ahead: three traffic cones narrow the lane while a
+       sudden-brake car blocks the exit. Ego must weave through and stop."
+       Interesting visually: props + vehicle, multi-adversary, slow speed.
+
+ T12  "Dense fog: two pedestrians cross from opposite sides of the road
+       simultaneously, appearing only 6 metres ahead of ego."
+       Visually dramatic: fog + multi-pedestrian, very short TTC.
+
+ T13  "Night scene: ego turns left at a junction while an oncoming vehicle
+       runs the red light at high speed. A pedestrian is also crossing
+       the exit lane."
+       Rich multi-threat: night, left_turn, red_light, pedestrian occlusion.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 8. VISUALISATION TIPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ - TAB cycles display modes: behind-camera / top-camera / LiDAR BEV.
+   For pedestrian scenarios use "behind"; for junction/multi-adversary
+   use "lidar" BEV to see all actors relative to ego at once.
+
+ - Set "loop": {"max_episodes": 5, "episode_duration_seconds": 20} in the
+   generated JSON to auto-repeat the scenario and observe variance across
+   different spawn rotations.
+
+ - Add "display": {"camera": "top"} to the JSON to default to the elevated
+   camera, which gives better situational overview for intersection scenarios.
+
+ - For fog scenarios (T12) the LiDAR BEV is more informative than RGB, since
+   the camera view will be visually washed out — exactly as intended.
+
+================================================================================
